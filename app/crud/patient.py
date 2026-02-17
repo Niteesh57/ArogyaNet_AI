@@ -26,7 +26,11 @@ class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
             selectinload(Patient.hospital),
             selectinload(Patient.assigned_doctor).selectinload(Doctor.user)
         ).offset(skip).limit(limit)
-        result = await db.execute(query)
         return result.scalars().all()
+
+    async def get_by_user_id(self, db: AsyncSession, *, user_id: str) -> Optional[Patient]:
+        query = select(Patient).filter(Patient.user_id == user_id)
+        result = await db.execute(query)
+        return result.scalars().first()
 
 patient = CRUDPatient(Patient)

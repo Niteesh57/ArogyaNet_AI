@@ -21,6 +21,7 @@ class AppointmentSuggestionRequest(BaseModel):
     description: str
     appointment_date: Optional[date] = None
     patient_id: Optional[str] = None
+    hospital_id: Optional[str] = None
 
 
 @router.post("/suggest-appointment", response_model=AppointmentSummary)
@@ -42,16 +43,18 @@ async def suggest_appointment(
     
     **Requires:** GEMINI_API_KEY environment variable
     """
-    if not current_user.hospital_id:
+    target_hospital_id = request.hospital_id or current_user.hospital_id
+    
+    if not target_hospital_id:
         raise HTTPException(
             status_code=400, 
-            detail="User must be associated with a hospital"
+            detail="Hospital ID must be provided either in request or user profile"
         )
     
     try:
         suggestion = await create_appointment_suggestion(
             description=request.description,
-            hospital_id=current_user.hospital_id,
+            hospital_id=target_hospital_id,
             db=db,
             appointment_date=request.appointment_date,
             patient_id=request.patient_id

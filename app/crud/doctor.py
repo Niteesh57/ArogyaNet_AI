@@ -34,6 +34,7 @@ class CRUDDoctor(CRUDBase[Doctor, DoctorCreate, DoctorUpdate]):
         ).join(User, Doctor.user_id == User.id).filter(
             or_(
                 User.full_name.ilike(search_term),
+                User.email.ilike(search_term),
                 Doctor.specialization.ilike(search_term)
             )
         )

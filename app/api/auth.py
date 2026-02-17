@@ -78,6 +78,10 @@ async def register_user(
         # Determine if we should set admin_email on hospital? 
         # The schema has it, might be good to sync back.
         # But crud_hospital.create already ran. We can update it or just trust the input.
+    else:
+        # Standard user registration -> Force BASE role
+        user_in.role = UserRole.BASE
+        user_in.hospital_id = None
         
     user = await crud_user.create(db, obj_in=user_in)
     return user

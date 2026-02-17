@@ -89,6 +89,31 @@ async def get_doctor_name(
     await db.refresh(doctor, ["user"])
     return {"full_name": doctor.user.full_name if doctor.user else "Unknown"}
 
+@router.get("/hospital/{hospital_id}/search", response_model=List[DoctorResponse])
+async def search_doctors_in_hospital(
+    hospital_id: str,
+    q: str = Query(..., min_length=1),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Search doctors in a specific hospital by name or email.
+    
+    - **Hospital ID**: Specify the hospital
+    - **Query**: Search by name or specialization
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Clean inputs
+    hospital_id = hospital_id.strip()
+    q = q.strip()
+    
+    doctors = await crud_doctor.search(db, query=q, hospital_id=hospital_id)
+    logger.info(f"Found {len(doctors)} doctors")
+    
+    return doctors
+
 @router.get("/{id}/slots")
 async def get_doctor_slots(
     *,

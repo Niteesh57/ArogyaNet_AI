@@ -5,6 +5,23 @@ from app.models.appointment import Appointment
 from app.schemas.appointment import AppointmentCreate, AppointmentUpdate
 
 class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate]):
+    async def get_by_patient(
+        self, db: AsyncSession, *, patient_id: str
+    ) -> list[Appointment]:
+        from sqlalchemy import select
+        from sqlalchemy.orm import selectinload, joinedload
+        from app.models.doctor import Doctor
+        
+        query = select(Appointment).options(
+            selectinload(Appointment.doctor).selectinload(Doctor.user),
+            selectinload(Appointment.doctor).selectinload(Doctor.hospital)
+        ).filter(
+            Appointment.patient_id == patient_id
+        ).order_by(Appointment.date.desc(), Appointment.slot.asc())
+        
+        result = await db.execute(query)
+        return result.scalars().all()
+
     async def get_by_doctor_date(
         self, db: AsyncSession, *, doctor_id: str, date: Any
     ) -> list[Appointment]:

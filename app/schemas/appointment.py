@@ -50,3 +50,13 @@ class Appointment(AppointmentBase):
 
     class Config:
         from_attributes = True
+
+from app.schemas.doctor import DoctorResponse
+from app.schemas.hospital import Hospital
+
+class AppointmentWithDoctor(Appointment):
+    doctor_name: Optional[str] = None
+    doctor_specialization: Optional[str] = None
+    hospital_name: Optional[str] = None
+    doctor: Optional[DoctorResponse] = None
+    hospital: Optional[Hospital] = None

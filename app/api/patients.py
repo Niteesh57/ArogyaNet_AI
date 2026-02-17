@@ -37,31 +37,88 @@ async def create_patient_with_appointment(
         patient_in.hospital_id = current_user.hospital_id
     
     # Check if user with this email already exists
-    existing_user = await crud_user.get_by_email(db, email=patient_in.email)
+    # Check if user with this email already exists
+    # If current user is BASE, they are signing up themselves, so use them
+    # irrespective of email case mismatch in input
+    if current_user.role == UserRole.BASE or str(current_user.role) == UserRole.BASE.value:
+         existing_user = current_user
+         print(f"DEBUG: Using current_user {current_user.id} (BASE) as existing_user")
+    else:
+         existing_user = await crud_user.get_by_email(db, email=patient_in.email)
+         print(f"DEBUG: Looked up user by email {patient_in.email}: {existing_user.id if existing_user else 'None'}")
+    
+    patient = None
+    
     if existing_user:
-        raise HTTPException(status_code=400, detail="User with this email already exists")
-    
-    # 2. Auto-create user account for patient
-    user_data = UserCreate(
-        email=patient_in.email,
-        full_name=patient_in.full_name,
-        phone_number=patient_in.phone,
-        password=get_password_hash(patient_in.password or "Patient@123"),
-        role=UserRole.PATIENT,
-        hospital_id=patient_in.hospital_id,
-        is_active=True,
-        is_verified=True
-    )
-    created_user = await crud_user.create(db, obj_in=user_data)
-    
-    # 3. Create patient record linked to user
-    patient_data = patient_in.model_dump(exclude={"email", "password", "appointment"})
-    patient_data["user_id"] = created_user.id
-    
-    patient = PatientModel(**patient_data)
-    db.add(patient)
-    await db.commit()
-    await db.refresh(patient)
+        # Check if we need to upgrade role from BASE to PATIENT
+        # Use string comparison to be safe against Enum/String mismatches
+        should_upgrade = False
+        if existing_user.role == UserRole.BASE:
+            should_upgrade = True
+        elif str(existing_user.role) == UserRole.BASE.value:
+            should_upgrade = True
+        elif str(existing_user.role) == "base":
+             should_upgrade = True
+             
+        if should_upgrade:
+            # Use dict to force update
+            user_update_data = {"role": UserRole.PATIENT.value}
+            
+            if not existing_user.hospital_id and patient_in.hospital_id:
+                user_update_data["hospital_id"] = patient_in.hospital_id
+            
+            # Update user role
+            try:
+                created_user = await crud_user.update(db, db_obj=existing_user, obj_in=user_update_data)
+            except Exception as e:
+                # Log error if needed, but fallback to existing user to avoid breaking flow
+                created_user = existing_user
+        else:
+            created_user = existing_user
+
+        # User exists, check if patient record exists
+        # We need to find patient by user_id
+        # Assuming crud_patient has get_by_user_id or we filter
+        from sqlalchemy import select
+        stmt = select(PatientModel).filter(PatientModel.user_id == existing_user.id)
+        result = await db.execute(stmt)
+        patient = result.scalars().first()
+        
+        if not patient:
+            # User exists but no patient record, create one
+            patient_data = patient_in.model_dump(exclude={"email", "password", "appointment"})
+            patient_data["user_id"] = existing_user.id
+            if not patient_data.get("hospital_id") and existing_user.hospital_id:
+                patient_data["hospital_id"] = existing_user.hospital_id
+            elif not patient_data.get("hospital_id") and patient_in.hospital_id:
+                 patient_data["hospital_id"] = patient_in.hospital_id
+                
+            patient = PatientModel(**patient_data)
+            db.add(patient)
+            await db.commit()
+            await db.refresh(patient)
+    else:
+        # 2. Auto-create user account for patient
+        user_data = UserCreate(
+            email=patient_in.email,
+            full_name=patient_in.full_name,
+            phone_number=patient_in.phone,
+            password=get_password_hash(patient_in.password or "Patient@123"),
+            role=UserRole.PATIENT,
+            hospital_id=patient_in.hospital_id,
+            is_active=True,
+            is_verified=True
+        )
+        created_user = await crud_user.create(db, obj_in=user_data)
+        
+        # 3. Create patient record linked to user
+        patient_data = patient_in.model_dump(exclude={"email", "password", "appointment"})
+        patient_data["user_id"] = created_user.id
+        
+        patient = PatientModel(**patient_data)
+        db.add(patient)
+        await db.commit()
+        await db.refresh(patient)
     
     # 4. Create Appointment if provided
     if patient_in.appointment:
