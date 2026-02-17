@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from app.api import deps
 from app.models.user import User
 from app.agent.summarizeAgent import create_appointment_suggestion
-from app.agent.models.summarizeModel import AppointmentSummary
+from app.agent.Basemodels.summarizeModel import AppointmentSummary
 
 router = APIRouter()
 

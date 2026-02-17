@@ -23,6 +23,16 @@ class AppointmentBase(BaseModel):
 class AppointmentCreate(AppointmentBase):
     pass
 
+class AppointmentCreateWithoutPatient(BaseModel):
+    doctor_id: str
+    description: Optional[str] = None
+    date: date
+    slot: str
+    severity: SeverityLevel
+    remarks: Optional[AppointmentRemarks] = None
+    next_followup: Optional[date] = None
+    lab_report_id: Optional[str] = None
+
 class AppointmentUpdate(BaseModel):
     doctor_id: Optional[str] = None
     description: Optional[str] = None

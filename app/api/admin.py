@@ -261,7 +261,46 @@ async def create_patient(
     patient_in: PatientCreate,
     current_user: User = Depends(deps.get_current_hospital_admin),
 ) -> Any:
-    patient = await crud_patient.create(db, obj_in=patient_in)
+    """
+    Create a new patient.
+    
+    - Creates a new User account with role PATIENT
+    - Creates a Patient profile linked to the User
+    """
+    from app.crud.user import user as crud_user
+    from app.schemas.user import UserCreate
+    from app.core.security import get_password_hash
+    from app.models.user import UserRole
+    from app.models.patient import Patient as PatientModel
+    
+    # Check if user with this email already exists
+    existing_user = await crud_user.get_by_email(db, email=patient_in.email)
+    if existing_user:
+        raise HTTPException(status_code=400, detail="User with this email already exists")
+    
+    # 1. Create User account
+    user_data = UserCreate(
+        email=patient_in.email,
+        full_name=patient_in.full_name,
+        phone_number=patient_in.phone,
+        password=get_password_hash(patient_in.password or "Patient@123"),
+        role=UserRole.PATIENT,
+        hospital_id=current_user.hospital_id,
+        is_active=True,
+        is_verified=True
+    )
+    created_user = await crud_user.create(db, obj_in=user_data)
+    
+    # 2. Create Patient profile
+    patient_data = patient_in.model_dump(exclude={"email", "password"})
+    patient_data["user_id"] = created_user.id
+    patient_data["hospital_id"] = current_user.hospital_id
+    
+    patient = PatientModel(**patient_data)
+    db.add(patient)
+    await db.commit()
+    await db.refresh(patient)
+    
     return patient
 
 @router.post("/medicines/create", response_model=Medicine)

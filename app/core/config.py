@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     SESSION_SECRET: str = "super-secret-session-key"
     
     IMGBB_API_KEY: str = "ac2540a154fa82c1350b98214446a8ee"
+    GEMINI_API_KEY: str = ""
+    GENERAL_MODEL: str = ""
     
     FIRST_SUPERUSER: EmailStr = "admin@example.com"
     FIRST_SUPERUSER_PASSWORD: str = "adminpassword"

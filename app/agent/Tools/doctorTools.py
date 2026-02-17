@@ -56,6 +56,7 @@ async def get_doctors_with_availability(
     
     for doctor, user in doctors_data:
         # Get availability for this day
+        # Note: We need to handle potential multiple availability records (e.g. split shifts)
         availability_query = select(Availability).filter(
             and_(
                 Availability.staff_type == "doctor",
@@ -66,6 +67,10 @@ async def get_doctors_with_availability(
         availability_result = await db.execute(availability_query)
         availabilities = availability_result.scalars().all()
         
+        # If doctor has no availability defined for this day, skip them
+        if not availabilities:
+            continue
+            
         # Get booked appointments for today
         appointments_query = select(Appointment).filter(
             and_(
@@ -77,33 +82,30 @@ async def get_doctors_with_availability(
         booked_appointments = appointments_result.scalars().all()
         
         # Extract booked slots
-        booked_slots = [apt.slot for apt in booked_appointments]
+        booked_slots = set(apt.slot for apt in booked_appointments)
         
         # Generate available time slots based on availability
         available_time_slots = []
         for avail in availabilities:
             slots = generate_time_slots(avail.start_time, avail.end_time)
             available_time_slots.extend(slots)
+            
+        # Remove duplicates if any (e.g. overlapping availability)
+        available_time_slots = sorted(list(set(available_time_slots)))
         
         # Filter out booked slots
         free_slots = [slot for slot in available_time_slots if slot not in booked_slots]
+        
+        # If doctor has no free slots, skip them (AI shouldn't suggest fully booked doctors)
+        if not free_slots:
+            continue
         
         doctor_info = {
             "doctor_id": doctor.id,
             "name": user.full_name,
             "specialization": doctor.specialization,
             "experience_years": doctor.experience_years,
-            "tags": doctor.tags,
-            "availability": [
-                {
-                    "start_time": avail.start_time.strftime("%H:%M"),
-                    "end_time": avail.end_time.strftime("%H:%M")
-                } for avail in availabilities
-            ],
-            "booked_slots": booked_slots,
-            "available_slots": free_slots,
-            "total_slots": len(available_time_slots),
-            "booked_count": len(booked_slots),
+            "available_slots": free_slots, # Only send available slots to AI
             "free_count": len(free_slots)
         }
         

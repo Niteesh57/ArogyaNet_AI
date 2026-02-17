@@ -6,12 +6,12 @@ import os
 from typing import Optional
 from datetime import date, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from google import genai
-from google.genai import types
+import google.generativeai as genai
+
 
 from app.agent.Tools.doctorTools import get_doctors_with_availability
-from app.agent.models.summarizeModel import AppointmentSummary, ConversationSummary
-
+from app.agent.Basemodels.summarizeModel import AppointmentSummary, ConversationSummary
+from app.core.config import settings
 
 class AppointmentAgent:
     """
@@ -20,12 +20,8 @@ class AppointmentAgent:
     """
     
     def __init__(self):
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY environment variable not set")
-        
-        self.client = genai.Client(api_key=api_key)
-        self.model_name = "gemini-2.0-flash-exp"  # Use available Gemini model
+        genai.configure(api_key="AIzaSyD0sWYRnnfSNHUKa37FId8HgH3dCGItPSo")
+        self.model_name = settings.GENERAL_MODEL
     
     async def analyze_and_suggest_appointment(
         self,
@@ -66,24 +62,61 @@ class AppointmentAgent:
         prompt = self._create_analysis_prompt(description, doctor_info, appointment_date)
         
         # Call Gemini API with structured output
-        response = self.client.models.generate_content(
-            model=self.model_name,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.3,
-                response_mime_type="application/json",
-                response_schema=AppointmentSummary
-            )
+        model = genai.GenerativeModel(
+            model_name=self.model_name,
+            generation_config={
+                "temperature": 0.3,
+                "response_mime_type": "application/json"
+            }
         )
+        response = model.generate_content(prompt)
         
         # Parse the structured response
         import json
-        result = json.loads(response.text)
+        try:
+            result = json.loads(response.text)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to parse AI response as JSON: {response.text}") from e
+        
+        # Validate required fields (check for both missing keys and None values)
+        required_fields = ["doctor_id", "severity", "enhanced_description"]
+        missing_fields = [field for field in required_fields if not result.get(field)]
+        
+        if missing_fields:
+            raise ValueError(
+                f"AI response missing or null for required fields: {', '.join(missing_fields)}. "
+                f"Full response: {result}"
+            )
+        
+        # Handle slot_time - if AI returns null, select intelligently based on severity
+        slot_time = result.get("slot_time")
+        if not slot_time:
+            # Find the doctor to get their available slots
+            selected_doctor = None
+            for doctor in doctors:
+                if doctor["doctor_id"] == result["doctor_id"]:
+                    selected_doctor = doctor
+                    break
+            
+            if selected_doctor and selected_doctor.get("available_slots"):
+                severity = result["severity"].lower()
+                available_slots = selected_doctor["available_slots"]
+                
+                # For high/critical: pick earliest slot
+                # For low/medium: pick first available
+                if severity in ["high", "critical"]:
+                    slot_time = available_slots[0]  # First/earliest slot
+                else:
+                    slot_time = available_slots[0]  # Any available slot
+            else:
+                raise ValueError(
+                    f"AI did not provide slot_time and no fallback slots available for doctor {result['doctor_id']}"
+                )
         
         # Create AppointmentSummary object
         appointment_summary = AppointmentSummary(
             doctor_id=result["doctor_id"],
-            slot_time=result["slot_time"],
+            slot_time=slot_time,  # Use validated/fallback slot_time
             severity=result["severity"],
             enhanced_description=result["enhanced_description"],
             appointment_date=appointment_date,
@@ -96,7 +129,8 @@ class AppointmentAgent:
         """Format doctor information for AI prompt."""
         info_lines = []
         for doctor in doctors:
-            available_slots = ", ".join(doctor["available_slots"][:10])  # Show first 10 slots
+            # Join slots into a comma-separated string, limiting to first 15 for brevity if needed
+            available_slots = ", ".join(doctor["available_slots"][:15])  
             info_lines.append(
                 f"- Doctor ID: {doctor['doctor_id']}\n"
                 f"  Name: {doctor['name']}\n"
@@ -127,19 +161,46 @@ Available Doctors:
 Instructions:
 1. Analyze the symptoms/condition described
 2. Match with the most appropriate doctor based on specialization
-3. Suggest a suitable time slot from their available slots
+3. SELECT A TIME SLOT based on severity:
+   - For HIGH or CRITICAL severity: Pick the EARLIEST available slot from the doctor's available slots
+   - For LOW or MEDIUM severity: Pick any available slot within the next 1-2 hours
+   - IMPORTANT: You MUST pick an actual slot from the "Available Slots" list shown above
+   - DO NOT return null or empty string for slot_time
 4. Determine severity level (low, medium, high, critical) based on:
    - low: routine checkups, minor issues
-   - medium: persistent symptoms, moderate concerns
+   - medium: persistent symptoms, moderate concerns (e.g., fever for 3 days)
    - high: severe symptoms, urgent but not life-threatening
    - critical: emergency situations, severe pain, life-threatening
 5. Create an enhanced description that summarizes the condition professionally
 
-Provide your response as JSON with:
-- doctor_id: The ID of the most suitable doctor
-- slot_time: A recommended time slot (HH:MM format)
-- severity: The severity level (low/medium/high/critical)
-- enhanced_description: A professional summary of the patient's condition
+CRITICAL RULES:
+- ALL fields are REQUIRED and MUST NOT be null or empty
+- slot_time MUST be a valid HH:MM format from the available slots list
+- severity MUST be exactly one of: low, medium, high, critical
+
+Response Format (strict JSON):
+{{
+  "doctor_id": "string (exact ID from the available doctors list)",
+  "slot_time": "string (HH:MM format, e.g., '10:30' - MUST be from available slots)",
+  "severity": "string (one of: low, medium, high, critical)",
+  "enhanced_description": "string (professional summary, minimum 10 characters)"
+}}
+
+Example for medium severity (fever):
+{{
+  "doctor_id": "abc-123",
+  "slot_time": "14:00",
+  "severity": "medium",
+  "enhanced_description": "Patient presenting with fever persisting for 3 days. Requires medical evaluation for potential infection."
+}}
+
+Example for high severity (severe pain):
+{{
+  "doctor_id": "xyz-789",
+  "slot_time": "09:00",
+  "severity": "high",
+  "enhanced_description": "Patient experiencing severe abdominal pain. Urgent medical attention required."
+}}
 """
 
 

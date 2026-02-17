@@ -5,12 +5,13 @@ from sqlalchemy import select, or_
 from app.api import deps
 from app.crud.nurse import nurse as crud_nurse
 from app.schemas.nurse import NurseResponse, NurseUpdate
+from app.schemas.user import User as UserSchema
 from app.models.user import User
 from app.models.nurse import Nurse
 
 router = APIRouter()
 
-@router.get("/search-potential", response_model=List[Any])
+@router.get("/search-potential", response_model=List[UserSchema])
 async def search_potential_nurses(
     q: str = Query(..., min_length=1),
     db: AsyncSession = Depends(deps.get_db),
