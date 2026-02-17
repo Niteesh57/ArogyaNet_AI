@@ -20,6 +20,7 @@ async def consultation_update(
     id: str,
     remarks_in: AppointmentRemarks,
     severity: Optional[str] = None, # Should match SeverityLevel enum value
+    status: Optional[str] = None, # Should match AppointmentStatus enum value
     next_followup: Optional[date] = None,
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
@@ -28,6 +29,7 @@ async def consultation_update(
     
     - Add remarks (text, medicine, lab)
     - Update severity
+    - Update status (started, in_progress, finished, admitted)
     - Set next follow-up date
     """
     # 1. Verify Doctor
@@ -52,6 +54,9 @@ async def consultation_update(
         
     if severity:
         update_data["severity"] = severity
+
+    if status:
+        update_data["status"] = status
         
     if next_followup:
         update_data["next_followup"] = next_followup

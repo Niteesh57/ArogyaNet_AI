@@ -1,7 +1,7 @@
 from typing import Optional
 from datetime import datetime, date
 from pydantic import BaseModel, EmailStr
-from app.models.appointment import SeverityLevel
+from app.models.appointment import SeverityLevel, AppointmentStatus
 
 # Remarks structure for appointments
 class AppointmentRemarks(BaseModel):
@@ -15,6 +15,7 @@ class AppointmentBase(BaseModel):
     description: Optional[str] = None  # Optional
     date: date  # Mandatory
     slot: str  # Mandatory - e.g., "10:30", "11:00", "11:30"
+    status: AppointmentStatus = AppointmentStatus.STARTED
     severity: SeverityLevel  # Mandatory
     remarks: Optional[AppointmentRemarks] = None  # Optional
     next_followup: Optional[date] = None  # Optional
@@ -28,6 +29,7 @@ class AppointmentCreateWithoutPatient(BaseModel):
     description: Optional[str] = None
     date: date
     slot: str
+    status: AppointmentStatus = AppointmentStatus.STARTED
     severity: SeverityLevel
     remarks: Optional[AppointmentRemarks] = None
     next_followup: Optional[date] = None
@@ -38,6 +40,7 @@ class AppointmentUpdate(BaseModel):
     description: Optional[str] = None
     date: Optional[date] = None
     slot: Optional[str] = None
+    status: Optional[AppointmentStatus] = None
     severity: Optional[SeverityLevel] = None
     remarks: Optional[AppointmentRemarks] = None
     next_followup: Optional[date] = None

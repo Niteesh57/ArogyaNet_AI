@@ -11,6 +11,12 @@ class SeverityLevel(str, enum.Enum):
     HIGH = "high"
     CRITICAL = "critical"
 
+class AppointmentStatus(str, enum.Enum):
+    STARTED = "started"
+    IN_PROGRESS = "in_progress"
+    FINISHED = "finished"
+    ADMITTED = "admitted"
+
 class Appointment(Base):
     __tablename__ = "appointments"
 
@@ -20,6 +26,7 @@ class Appointment(Base):
     description = Column(String)
     date = Column(Date, nullable=False)
     slot = Column(String, nullable=False)  # e.g., "10:30", "11:00", "11:30"
+    status = Column(String, default=AppointmentStatus.STARTED.value)
     severity = Column(String, default=SeverityLevel.LOW.value)
     remarks = Column(JSON, nullable=True)  # {text: str, lab: [], medicine: []}
     next_followup = Column(Date, nullable=True)
