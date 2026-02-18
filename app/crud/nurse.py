@@ -12,6 +12,24 @@ class CRUDNurse(CRUDBase[Nurse, NurseCreate, NurseUpdate]):
         result = await db.execute(query)
         return result.scalars().first()
 
+    async def search(
+        self, db: AsyncSession, *, query: str, hospital_id: str
+    ) -> List[Nurse]:
+        from app.models.user import User
+        from sqlalchemy import or_
+        
+        search_term = f"%{query}%"
+        stmt = select(Nurse).join(Nurse.user).filter(
+            Nurse.hospital_id == hospital_id,
+            or_(
+                User.full_name.ilike(search_term),
+                User.email.ilike(search_term)
+            )
+        ).options(selectinload(Nurse.user))
+        
+        result = await db.execute(stmt)
+        return result.scalars().all()
+
     async def get_multi(
         self, db: AsyncSession, *, skip: int = 0, limit: int = 100
     ) -> List[Nurse]:

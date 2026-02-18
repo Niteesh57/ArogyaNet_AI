@@ -5,7 +5,7 @@ from app.api import deps
 from app.crud.patient import patient as crud_patient
 from app.schemas.patient import Patient, PatientUpdate, PatientCreate, PatientWithAppointmentCreate
 from app.schemas.user import User as UserSchema
-from app.models.user import User
+from app.models.user import User, UserRole
 
 router = APIRouter()
 
@@ -164,7 +164,23 @@ async def search_patients(
     # Allowing search across all BASE users for now to let them be "admitted"
         
     users = (await db.execute(query)).scalars().all()
+    users = (await db.execute(query)).scalars().all()
     return users
+
+@router.get("/{id}", response_model=Patient)
+async def read_patient(
+    *,
+    db: AsyncSession = Depends(deps.get_db),
+    id: str,
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Get patient by ID.
+    """
+    patient = await crud_patient.get(db, id=id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    return patient
 
 @router.get("/{id}/name")
 async def get_patient_name(
@@ -258,6 +274,51 @@ async def update_patient(
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
     patient = await crud_patient.update(db, db_obj=patient, obj_in=patient_in)
+    return patient
+
+@router.put("/{id}/assign-nurse", response_model=Patient)
+async def assign_nurse(
+    id: str,
+    nurse_id: str = Query(...),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Assign a nurse to a patient.
+    Only Doctors or Admins should do this.
+    """
+    if current_user.role not in [UserRole.DOCTOR.value, UserRole.HOSPITAL_ADMIN.value, UserRole.SUPER_ADMIN.value]:
+         raise HTTPException(status_code=403, detail="Not authorized to assign nurses")
+
+    patient = await crud_patient.get(db, id=id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+        
+    # Verify nurse exists?
+    # For now, just setting the ID. Foreign key constraint will catch invalid IDs if we commit.
+    # But better to check.
+    from app.crud.nurse import nurse as crud_nurse
+    nurse = await crud_nurse.get(db, id=nurse_id) # This expects Nurse UUID
+    
+    if not nurse:
+         # Fallback: Check if the provided ID is actually a User ID linked to a Nurse profile
+         from sqlalchemy import select
+         from app.models.nurse import Nurse as NurseModel
+         stmt = select(NurseModel).filter(NurseModel.user_id == nurse_id)
+         result = await db.execute(stmt)
+         nurse = result.scalars().first()
+         
+    if not nurse:
+         raise HTTPException(status_code=404, detail="Nurse not found")
+    
+    # Update patient with the correct Nurse ID (profile ID), not User ID
+    # The Foreign Key points to nurses.id
+    nurse_id = nurse.id
+
+    patient.assigned_nurse_id = nurse_id
+    db.add(patient)
+    await db.commit()
+    await db.refresh(patient)
     return patient
 
 @router.delete("/{id}", response_model=Patient)

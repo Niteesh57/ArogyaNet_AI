@@ -15,10 +15,12 @@ class Patient(Base):
     phone = Column(String, nullable=True)
     hospital_id = Column(String, ForeignKey("hospitals.id"), nullable=False)
     assigned_doctor_id = Column(String, ForeignKey("doctors.id"), nullable=True)
+    assigned_nurse_id = Column(String, ForeignKey("nurses.id"), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     user = relationship("User")
     hospital = relationship("Hospital", back_populates="patients")
     assigned_doctor = relationship("Doctor", back_populates="patients")
+    assigned_nurse = relationship("Nurse") # Backref could be added if needed
     appointments = relationship("Appointment", back_populates="patient")

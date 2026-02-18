@@ -36,3 +36,6 @@ class User(UserInDBBase):
 
 class UserInDB(UserInDBBase):
     hashed_password: str
+
+class LabAssistantCreate(BaseModel):
+    user_id: str

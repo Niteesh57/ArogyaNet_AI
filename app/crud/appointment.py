@@ -14,7 +14,8 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
         
         query = select(Appointment).options(
             selectinload(Appointment.doctor).selectinload(Doctor.user),
-            selectinload(Appointment.doctor).selectinload(Doctor.hospital)
+            selectinload(Appointment.doctor).selectinload(Doctor.hospital),
+            selectinload(Appointment.nurse)
         ).filter(
             Appointment.patient_id == patient_id
         ).order_by(Appointment.date.desc(), Appointment.slot.asc())
@@ -31,6 +32,25 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
             Appointment.doctor_id == doctor_id,
             Appointment.date == date
         )
+        result = await db.execute(query)
+        return result.scalars().all()
+
+    async def get_by_patient_and_doctor(
+        self, db: AsyncSession, *, patient_id: str, doctor_id: str
+    ) -> list[Appointment]:
+        from sqlalchemy import select
+        from sqlalchemy.orm import selectinload
+        from app.models.doctor import Doctor
+        
+        query = select(Appointment).options(
+            selectinload(Appointment.doctor).selectinload(Doctor.user),
+            selectinload(Appointment.doctor).selectinload(Doctor.hospital),
+            selectinload(Appointment.nurse)
+        ).filter(
+            Appointment.patient_id == patient_id,
+            Appointment.doctor_id == doctor_id
+        ).order_by(Appointment.date.desc(), Appointment.slot.desc())
+        
         result = await db.execute(query)
         return result.scalars().all()
 

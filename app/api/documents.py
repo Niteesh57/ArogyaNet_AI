@@ -34,13 +34,27 @@ async def upload_document(
         logger.error(f"Supabase upload failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload file to storage")
 
+    # 1.5 Fetch Appointment details if provided
+    db_appt = None
+    patient_id = None
+    doctor_id = None
+    
+    if appointment_id:
+        from app.crud.appointment import appointment as crud_appointment
+        db_appt = await crud_appointment.get(db, id=appointment_id)
+        if db_appt:
+            patient_id = db_appt.patient_id
+            doctor_id = db_appt.doctor_id
+
     # 2. Create DB Entry
     db_doc = document.Document(
         title=title,
         file_url=file_url,
         file_type=file.content_type,
         user_id=current_user.id,
-        appointment_id=appointment_id
+        appointment_id=appointment_id,
+        patient_id=patient_id,
+        doctor_id=doctor_id
     )
     db.add(db_doc)
     await db.commit()

@@ -13,6 +13,8 @@ class Document(Base):
     file_type = Column(String, nullable=True) # e.g. 'application/pdf', 'image/jpeg'
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     appointment_id = Column(String, ForeignKey("appointments.id"), nullable=True)
+    patient_id = Column(String, ForeignKey("patients.id"), nullable=True)
+    doctor_id = Column(String, ForeignKey("doctors.id"), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     owner = relationship("User", back_populates="documents")

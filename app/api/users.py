@@ -1,5 +1,5 @@
 from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api import deps
 from app.crud.user import user as crud_user
@@ -75,3 +75,32 @@ async def upload_user_image(
     updated_user = await crud_user.update(db, db_obj=current_user, obj_in=user_update)
     
     return {"image_url": image_url}
+    updated_user = await crud_user.update(db, db_obj=current_user, obj_in=user_update)
+    
+    return {"image_url": image_url}
+
+@router.get("/search/nurses", response_model=List[User])
+async def search_nurses(
+    q: str = Query(..., min_length=1),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_active_user), # Any staff can search?
+) -> Any:
+    """
+    Search for nurses by name or email.
+    Used by doctors to assign nurses.
+    """
+    from sqlalchemy import select, or_
+    
+    search_term = f"%{q}%"
+    
+    query = select(UserModel).filter(
+        UserModel.hospital_id == current_user.hospital_id,
+        UserModel.role == UserRole.NURSE.value,
+        or_(
+            UserModel.full_name.ilike(search_term),
+            UserModel.email.ilike(search_term)
+        )
+    ).limit(20)
+    
+    result = await db.execute(query)
+    return result.scalars().all()

@@ -1,7 +1,10 @@
+import logging
+import os
+import torch
 from langchain_huggingface import HuggingFacePipeline
 from transformers import AutoProcessor, AutoModelForCausalLM, AutoModel, pipeline
-import torch
-import os
+
+logger = logging.getLogger(__name__)
 
 # Local Model Paths
 MEDASR_PATH = r"C:\xampp\htdocs\opik_Backend\medasr"
@@ -13,15 +16,15 @@ class MedVQA:
     def __init__(self):
         self.space_id = "nagireddy5/lifehealth"
         self.hf_token = os.getenv("HUGGINGFACE_API_KEY")
-        print(f"Loading MedVQA from HF Space: {self.space_id}...")
+        logger.info(f"Loading MedVQA from HF Space: {self.space_id}...")
         self.client = None
         
         try:
             from gradio_client import Client
             self.client = Client(self.space_id)
-            print("MedVQA HF Space Client loaded.")
+            logger.info("MedVQA HF Space Client loaded.")
         except Exception as e:
-            print(f"Warning: Could not connect to MedVQA Space {self.space_id}: {e}")
+            logger.warning(f"Could not connect to MedVQA Space {self.space_id}: {e}")
 
     def answer_question(self, question, image_path=None):
         if not self.client:
@@ -33,20 +36,7 @@ class MedVQA:
 
         try:
             # API expects image_url (string) and question (string)
-            # If image_path is provided, we assume it's a URL or handle upload?
-            # User output says "image_url: str (optrional)".
-            # If we have a local path but API wants URL, we have a problem unless gradio_client handles upload automatically
-            # when passed to a Textbox component? Usually Textbox expects string.
-            # However, docAgent passes a local path for downloaded images.
-            # If the image was originally a URL, we should pass that URL.
-            # Let's assume image_path might be a URL string if it starts with http.
-            
-            # If it is a local file path, gradio_client might not upload it for a Textbox input.
-            # But let's check if the previous step downloaded it.
-            
             image_url = image_path if image_path else None
-            
-            print(f"DEBUG: Sending to HF Space: question='{question}', image_url='{image_url}'")
             
             result = self.client.predict(
                 image_url=image_url, 
@@ -54,38 +44,37 @@ class MedVQA:
                 api_name="/stream_answer" 
             )
             
-            print(f"DEBUG: Space Response: {result}")
             return result
             
         except Exception as e:
-            print(f"Inference Error: {e}")
+            logger.error(f"Inference Error: {e}")
             return f"Error processing request: {e}"
 
 class PathFoundation:
     def __init__(self):
         self.model_id = PATH_FOUNDATION_PATH
-        print(f"Loading PathFoundation from {self.model_id}...")
+        logger.info(f"Loading PathFoundation from {self.model_id}...")
         try:
             self.model = AutoModel.from_pretrained(self.model_id, trust_remote_code=True, device_map="auto")
-            print("PathFoundation loaded.")
+            logger.info("PathFoundation loaded.")
         except Exception as e:
-            print(f"Warning: Failed to load PathFoundation: {e}")
+            logger.warning(f"Failed to load PathFoundation: {e}")
 
 class HearModel:
     def __init__(self):
         self.model_id = HEAR_PATH
-        print(f"Loading HeAR from {self.model_id}...")
+        logger.info(f"Loading HeAR from {self.model_id}...")
         try:
             self.model = AutoModel.from_pretrained(self.model_id, trust_remote_code=True, device_map="auto")
-            print("HeAR loaded.")
+            logger.info("HeAR loaded.")
         except Exception as e:
-            print(f"Warning: Failed to load HeAR: {e}")
+            logger.warning(f"Failed to load HeAR: {e}")
 
 class MedASR:
     def __init__(self):
         self.model_id = MEDASR_PATH
         self.pipeline = None
-        print(f"Loading MedASR from {self.model_id}...")
+        logger.info(f"Loading MedASR from {self.model_id}...")
         try:
              self.pipeline = pipeline(
                 "automatic-speech-recognition", 
@@ -95,9 +84,9 @@ class MedASR:
                 stride_length_s=5,
                 trust_remote_code=True
             )
-             print("MedASR Model loaded.")
+             logger.info("MedASR Model loaded.")
         except Exception as e:
-            print(f"Warning: Could not load MedASR from {self.model_id}: {e}")
+            logger.warning(f"Could not load MedASR from {self.model_id}: {e}")
 
     def transcribe(self, audio_input):
         if not self.pipeline: return ""

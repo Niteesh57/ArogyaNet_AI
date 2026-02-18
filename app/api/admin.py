@@ -22,6 +22,7 @@ from app.schemas.floor import FloorCreate, Floor
 from app.schemas.availability import AvailabilityCreate, Availability
 from app.schemas.hospital import HospitalCreate, Hospital
 from app.models.user import User
+from app.schemas.user import LabAssistantCreate, User as UserSchema
 from app.crud.hospital import hospital as crud_hospital
 
 router = APIRouter()
@@ -29,7 +30,7 @@ router = APIRouter()
 @router.get("/staff/search")
 async def search_staff(
     q: str = Query(..., min_length=1),
-    role_filter: str = Query(None, regex="^(doctor|nurse)$"),
+    role_filter: str = Query(None, pattern="^(doctor|nurse)$"),
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_hospital_admin),
 ) -> Any:
@@ -108,7 +109,6 @@ async def create_doctor(
     # The schema DoctorCreate requires user_id. 
     # In a real app, admin might creating user AND doctor profile together.
     # For now, assuming user exists or separate flow.
-    # For now, assuming user exists or separate flow.
     doctor_in.created_by = current_user.id
     
     # Get the user to promote their role
@@ -137,18 +137,6 @@ async def create_doctor(
     existing_doctor = await db.execute(select(Doctor).filter(Doctor.license_number == doctor_in.license_number))
     if existing_doctor.scalars().first():
         raise HTTPException(status_code=400, detail="Doctor with this license number already exists")
-
-    # Check for existing license number
-    from app.models.doctor import Doctor
-    existing_doctor = await db.execute(select(Doctor).filter(Doctor.license_number == doctor_in.license_number))
-    if existing_doctor.scalars().first():
-        raise HTTPException(status_code=400, detail="Doctor with this license number already exists")
-
-    # Check for existing license number
-    from app.models.doctor import Doctor
-    existing_doctor = await db.execute(select(Doctor).filter(Doctor.license_number == doctor_in.license_number))
-    if existing_doctor.scalars().first():
-        raise HTTPException(status_code=400, detail="Doctor with this license number already exists")
     
     # Promote user role to DOCTOR and assign hospital
     user.role = UserRole.DOCTOR.value
@@ -160,8 +148,6 @@ async def create_doctor(
     # Refresh with eager loading to avoid MissingGreenlet error
     await db.refresh(doctor, ["user"])
     return doctor
-
-    return nurse
 
 @router.post("/doctors/register", response_model=DoctorResponse)
 async def register_doctor(
@@ -215,6 +201,47 @@ async def register_doctor(
     # Refresh with eager loading to avoid MissingGreenlet error
     await db.refresh(doctor, ["user"])
     return doctor
+
+@router.post("/nurses/create", response_model=NurseResponse)
+async def create_nurse(
+    *,
+    db: AsyncSession = Depends(deps.get_db),
+    nurse_in: NurseCreate,
+    current_user: User = Depends(deps.get_current_hospital_admin),
+) -> Any:
+    nurse_in.created_by = current_user.id
+    
+    # Get the user to promote their role
+    user = await crud_user.get(db, id=nurse_in.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Only allow creating nurse profile for BASE users
+    if user.role != UserRole.BASE.value:
+        raise HTTPException(status_code=400, detail="User must be in BASE role to be assigned as nurse")
+    
+    # Check if user is already a nurse
+    from app.models.nurse import Nurse
+    existing_nurse_user = await db.execute(select(Nurse).filter(Nurse.user_id == nurse_in.user_id))
+    if existing_nurse_user.scalars().first():
+        raise HTTPException(status_code=400, detail="User is already assigned a nurse profile")
+
+    if not nurse_in.hospital_id:
+        nurse_in.hospital_id = current_user.hospital_id
+    
+    if not nurse_in.hospital_id:
+         raise HTTPException(status_code=422, detail="Hospital ID required.")
+    
+    # Promote user role to NURSE and assign hospital
+    user.role = UserRole.NURSE.value
+    user.hospital_id = nurse_in.hospital_id
+    db.add(user)
+    await db.commit()
+        
+    nurse = await crud_nurse.create(db, obj_in=nurse_in)
+    # Refresh with eager loading to avoid MissingGreenlet error
+    await db.refresh(nurse, ["user"])
+    return nurse
 
 @router.post("/nurses/register", response_model=NurseResponse)
 async def register_nurse(
@@ -359,3 +386,85 @@ async def get_dashboard_stats(
         "low_stock_medicines": 0,
         "total_lab_tests": 0
     }
+@router.put("/users/{user_id}/role", response_model=Any)
+async def update_user_role(
+    user_id: str,
+    role: UserRole,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_hospital_admin),
+) -> Any:
+    """
+    Update a user's role.
+    """
+    user = await crud_user.get(db, id=user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Prevent modifying self role if not super admin? 
+    # For simplicity, allow admin to manage users.
+    
+    # Check if user belongs to same hospital
+    if user.hospital_id != current_user.hospital_id and current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Not authorized to modify this user")
+
+    user.role = role.value
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return {"message": "Role updated successfully", "user": user}
+
+@router.post("/lab-assistants/create", response_model=UserSchema)
+async def create_lab_assistant(
+    *,
+    db: AsyncSession = Depends(deps.get_db),
+    lab_assistant_in: LabAssistantCreate,
+    current_user: User = Depends(deps.get_current_hospital_admin),
+) -> Any:
+    """
+    Promote a BASE user to LAB_ASSISTANT and assign to current hospital.
+    """
+    user = await crud_user.get(db, id=lab_assistant_in.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if user.role != UserRole.BASE.value:
+         raise HTTPException(status_code=400, detail="User must be in BASE role to be assigned as lab assistant")
+         
+    # Check if user is already assigned to a hospital (if not forcing reassignment)
+    if user.hospital_id and user.hospital_id != current_user.hospital_id:
+         raise HTTPException(status_code=400, detail="User is already assigned to another hospital")
+
+    user.role = UserRole.LAB_ASSISTANT.value
+    user.hospital_id = current_user.hospital_id
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+@router.delete("/lab-assistants/{user_id}", response_model=UserSchema)
+async def remove_lab_assistant(
+    *,
+    db: AsyncSession = Depends(deps.get_db),
+    user_id: str,
+    current_user: User = Depends(deps.get_current_hospital_admin),
+) -> Any:
+    """
+    Remove LAB_ASSISTANT role and hospital assignment.
+    """
+    user = await crud_user.get(db, id=user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if user.role != UserRole.LAB_ASSISTANT.value:
+        raise HTTPException(status_code=400, detail="User is not a lab assistant")
+        
+    if user.hospital_id != current_user.hospital_id:
+        raise HTTPException(status_code=403, detail="Not authorized to remove this staff member")
+
+    user.role = UserRole.BASE.value
+    user.hospital_id = None
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
+

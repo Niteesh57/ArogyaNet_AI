@@ -26,12 +26,13 @@ async def search_potential_nurses(
     from app.models.user import UserRole
     search_term = f"%{q}%"
     
+    # Only search for BASE users (not yet assigned as doctors)
     query = select(User).filter(
         or_(
             User.full_name.ilike(search_term),
             User.email.ilike(search_term)
         )
-    ).filter(User.role == UserRole.NURSE.value).limit(20)
+    ).filter(User.role == UserRole.BASE.value).limit(20)
     
     users = (await db.execute(query)).scalars().all()
     return users

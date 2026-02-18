@@ -29,7 +29,9 @@ class Appointment(Base):
     status = Column(String, default=AppointmentStatus.STARTED.value)
     severity = Column(String, default=SeverityLevel.LOW.value)
     remarks = Column(JSON, nullable=True)  # {text: str, lab: [], medicine: []}
+    # vitals = Column(JSON, default=list) # Deprecated, use AppointmentVital table
     next_followup = Column(Date, nullable=True)
+    nurse_id = Column(String, ForeignKey("users.id"), nullable=True) # Link to User (Nurse role)
     lab_report_id = Column(String, ForeignKey("lab_reports.id"), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -37,4 +39,6 @@ class Appointment(Base):
     # Relationships
     patient = relationship("Patient", back_populates="appointments")
     doctor = relationship("Doctor")
+    nurse = relationship("User", foreign_keys=[nurse_id])
     lab_report = relationship("LabReport", back_populates="appointments")
+    vital_logs = relationship("AppointmentVital", back_populates="appointment")

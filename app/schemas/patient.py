@@ -1,7 +1,10 @@
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel
-from app.schemas.appointment import AppointmentCreateWithoutPatient
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.schemas.appointment import AppointmentCreateWithoutPatient
 
 class PatientBase(BaseModel):
     full_name: str
@@ -37,4 +40,7 @@ class PatientSearchResponse(Patient):
     email: Optional[str] = None
 
 class PatientWithAppointmentCreate(PatientCreate):
-    appointment: Optional[AppointmentCreateWithoutPatient] = None
+    appointment: Optional["AppointmentCreateWithoutPatient"] = None
+
+from app.schemas.appointment import AppointmentCreateWithoutPatient
+PatientWithAppointmentCreate.model_rebuild()
