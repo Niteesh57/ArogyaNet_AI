@@ -8,11 +8,11 @@ from app.api.api import api_router
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.core.security import get_password_hash
-from app.models import specialization, user, document
+from app.models import specialization, user
 from sqlalchemy import select
 from app.core.database import SessionLocal
 
-from app.agent.LLM.llm import get_vqa_chain, get_medasr_chain, get_hear_model, get_path_foundation
+from app.agent.LLM.llm import get_vqa_chain, get_medasr_chain, get_siglip_model
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -26,20 +26,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to start agent worker: {e}")
 
-    # Startup
-    # Load AI Models (MedASR)
-    # Load AI Models
-    # try:
-       # get_medasr_chain()
-    # except Exception as e:
-    #     print(f"Warning: Failed to load MedASR model on startup: {e}")
-
+    # Initialize lightweight AI Clients
     try:
         get_vqa_chain()
-        # get_hear_model()
-        # get_path_foundation()
+        get_medasr_chain()
+        get_siglip_model()
+        logger.info("AI Agent Clients initialized.")
     except Exception as e:
-        print(f"Warning: Failed to load MedVQA model on startup: {e}")
+        logger.warning(f"Failed to initialize AI clients: {e}")
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

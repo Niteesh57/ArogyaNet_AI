@@ -80,28 +80,26 @@ from typing import List
 from app.models.appointment_chat import ChatResponse, AppointmentChat
 from sqlalchemy import select
 
-@router.post("/analyze", response_model=dict)
+from fastapi.responses import StreamingResponse
+
+@router.post("/analyze")
 async def analyze_report(
     request: DocAnalysisRequest,
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user),
 ):
     """
-    Analyze a medical document (PDF or Image) using MedGemma.
-    - Extracts text from PDF or loads image.
-    - Uses VQA agent to answer the question.
-    - Maintains conversation context per user.
-    - Saves chat history if appointment_id is provided.
+    Analyze a medical document using MedGemma (Streaming).
     """
     try:
-        response = await analyze_medical_document(
+        stream = analyze_medical_document(
             user_id=current_user.id,
             document_url=request.document_url,
             question=request.question,
             appointment_id=request.appointment_id,
             db=db
         )
-        return {"answer": response}
+        return StreamingResponse(stream, media_type="text/plain")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -139,6 +137,38 @@ async def trigger_outbound_call(
     try:
         await trigger_call(request.phone_number, request.appointment_id)
         return {"message": f"Call initiated to {request.phone_number}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class DeepResearchRequest(BaseModel):
+    image_url: Optional[str] = None
+    audio_url: Optional[str] = None
+    pdf_url: Optional[str] = None
+    vision_prompt: Optional[str] = None
+
+from app.agent.deepAgent import run_deep_research
+
+@router.post("/deep-research")
+async def deep_research_endpoint(
+    request: DeepResearchRequest,
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """
+    Multimodal Deep Research Agent (Streaming).
+    Returns a stream of JSON events:
+    - {"type": "status", "message": "..."}
+    - {"type": "token", "content": "..."}
+    """
+    try:
+        stream = run_deep_research(
+            image_url=request.image_url,
+            audio_url=request.audio_url,
+            pdf_url=request.pdf_url,
+            vision_prompt=request.vision_prompt
+        )
+        # Using text/event-stream for SSE compatibility
+        return StreamingResponse(stream, media_type="text/event-stream")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

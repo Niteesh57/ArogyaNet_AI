@@ -7,6 +7,7 @@ from app.models.patient import Patient
 from app.models.medicine import Medicine, InventoryLog, InventoryChangeType
 from app.models.lab_test import LabTest
 from app.models.floor import Floor
+from app.models.event import Event
 from app.models.availability import Availability, StaffType, DayOfWeek
 from app.models.document import Document
 from app.models.appointment import Appointment, AppointmentStatus, SeverityLevel

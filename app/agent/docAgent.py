@@ -75,7 +75,7 @@ async def analyze_document(state: AgentState):
         # Limit context size if needed? MedGemma has 8k context probably.
         prompt = f"System: You are an expert medical AI. Analyze the following medical report text and answer the user's question.\n\n{context_prefix}Report Context:\n{context[:6000]}\n\nUser Question: {question}"
         
-        response_text = llm.answer_question(question=prompt, image_path=None)
+        response_text = await llm.answer_question(question=prompt, image_path=None)
         
     else:
         # Image Context
@@ -86,10 +86,10 @@ async def analyze_document(state: AgentState):
 
         # Check if original URL is an image (simple check or rely on previous detection)
         if state.get("document_type") == "image":
-             response_text = llm.answer_question(question=final_question, image_path=document_url)
+             response_text = await llm.answer_question(question=final_question, image_path=document_url)
         else:
              # Fallback or if for some reason we only have local path
-             response_text = llm.answer_question(question=final_question, image_path=path)
+             response_text = await llm.answer_question(question=final_question, image_path=path)
         
         # Cleanup temp file? Maybe later or rely on OS cleanup
         try:
@@ -142,42 +142,84 @@ async def analyze_medical_document(user_id: str, document_url: str, question: st
     
     logger.info(f"Analyzing document with thread_id: {thread_id}, appointment_id: {appointment_id}, user_id: {user_id}")
     
-    config = {"configurable": {"thread_id": thread_id}}
+    # Run the graph (Load Document Phase)
+    # We run up to 'analyze_document' but we can't easily stream OUT of a node in a graph invoke.
+    # So we will use the 'load_document' node logic, then manually call LLM streaming.
     
-    # Run the graph
+    # 1. Load Document info first
+    # We can reuse the node function if we construct state manually, or just use the logic.
+    # Reusing the node function is cleaner but it expects state.
+    
+    doc_state = {
+        "document_url": document_url,
+        "messages": [HumanMessage(content=question)],
+        "long_term_memories": memories_str
+    }
+    
+    # Execute load_document node logic
     try:
-        result = await app.ainvoke(inputs, config=config)
+        loaded_data = await load_document(doc_state)
+        doc_state.update(loaded_data)
     except Exception as e:
-        logger.error(f"Error in app.ainvoke: {e}")
-        raise e
-        
-    ai_response = result["messages"][-1].content
+        logger.error(f"Error loading document: {e}")
+        yield f"Error loading document: {e}"
+        return
+
+    # 2. Prepare Prompt (Logic from analyze_document node)
+    llm = get_vqa_chain()
+    context_prefix = ""
+    if memories_str:
+        context_prefix = f"User Context (Memories):\n{memories_str}\n\n"
+
+    prompt = ""
+    image_path = None
     
-    # Save to DB if db session is provided
+    if doc_state.get("document_type") == "pdf":
+        context = doc_state.get("extracted_text", "")
+        prompt = f"System: You are an expert medical AI. Analyze the following medical report text and answer the user's question.\n\n{context_prefix}Report Context:\n{context[:6000]}\n\nUser Question: {question}"
+    else:
+        # Image
+        path = doc_state.get("local_image_path")
+        # MedVQA (remote) prefers URL
+        image_path = document_url if document_url else path
+        prompt = f"{context_prefix}Question: {question}"
+
+    # 3. Stream LLM Response
+    full_response = ""
+    try:
+        async for chunk in llm.answer_question(question=prompt, image_path=image_path):
+            full_response += chunk
+            yield chunk
+    except Exception as e:
+        logger.error(f"Streaming error: {e}")
+        yield f"Error generating response: {e}"
+        return
+
+    # Cleanup temp file if needed
+    if doc_state.get("local_image_path"):
+        try:
+             import os
+             os.remove(doc_state["local_image_path"])
+        except: pass
+
+    # 4. Save to DB (AppointmentChat) & Long Term Memory
     if db:
-        # Check for explicit "Remember" intent in question
-        # Heuristic: if question starts with "remember" or similar
+        # Save memory?
         lower_q = question.lower()
         if lower_q.startswith("remember") or "save this info" in lower_q:
-             # We store the question content (stripped) as memory. 
-             # Or we could store the answer. Usually user says "Remember I am allergic to X"
              await add_long_term_memory(user_id, question, db)
 
         if appointment_id:
             try:
                 from app.models.appointment_chat import AppointmentChat
-                
                 chat_entry = AppointmentChat(
                     appointment_id=appointment_id,
                     user_id=user_id,
                     message=question,
-                    response=ai_response,
+                    response=full_response,
                     document_url=document_url
                 )
                 db.add(chat_entry)
                 await db.commit()
-                await db.refresh(chat_entry)
             except Exception as e:
                 logger.error(f"Failed to save chat history: {e}")
-            
-    return ai_response

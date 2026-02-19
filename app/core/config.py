@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     GENERAL_MODEL: str = ""
     
     HUGGINGFACE_API_KEY: str = ""
+    HUGGINGFACE_SPACE: str = ""
+    TAVILY_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
     FIRST_SUPERUSER: EmailStr = "admin@example.com"
     FIRST_SUPERUSER_PASSWORD: str = "adminpassword"
 
@@ -47,6 +50,7 @@ class Settings(BaseSettings):
     LIVEKIT_API_KEY: str = ""
     LIVEKIT_API_SECRET: str = ""
     SIP_OUTBOUND_TRUNK_ID: str = ""
+    
 
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env", extra="ignore")
 

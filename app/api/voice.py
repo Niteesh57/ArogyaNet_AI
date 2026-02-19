@@ -17,7 +17,7 @@ async def transcribe_file(file: UploadFile = File(...)):
     try:
         audio_bytes = await file.read()
         logger.info(f"Received audio file of size: {len(audio_bytes)} bytes")
-        text = transcribe_audio(audio_bytes)
+        text = await transcribe_audio(audio_bytes)
         return {"text": text}
     except Exception as e:
         logger.error(f"File transcription error: {e}\n{traceback.format_exc()}")
@@ -90,7 +90,7 @@ async def websocket_transcribe(websocket: WebSocket):
                     continue
 
                 try:
-                    transcribed_text = transcribe_audio(audio_data)
+                    transcribed_text = await transcribe_audio(audio_data)
                     conversation_chunks.append(transcribed_text)
                     chunk_index += 1
 

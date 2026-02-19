@@ -32,6 +32,14 @@ async def init_db():
             except Exception:
                 pass 
 
+            try:
+                # Add keys to events table
+                await conn.execute(text("ALTER TABLE events ADD COLUMN keys JSON"))
+                print("Added column 'keys' to 'events' table.")
+            except Exception:
+                pass
+
+
             # Check Patient table for new columns
             try:
                 await conn.execute(text("ALTER TABLE patients ADD COLUMN assigned_nurse_id VARCHAR"))

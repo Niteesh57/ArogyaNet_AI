@@ -1,102 +1,99 @@
 import logging
 import os
-import torch
-from langchain_huggingface import HuggingFacePipeline
-from transformers import AutoProcessor, AutoModelForCausalLM, AutoModel, pipeline
-
+import httpx
+from typing import Optional
+from app.core.config import settings
 logger = logging.getLogger(__name__)
 
-# Local Model Paths
-MEDASR_PATH = r"C:\xampp\htdocs\opik_Backend\medasr"
-MEDGEMMA_PATH = r"C:\xampp\htdocs\opik_Backend\medgemma"
-PATH_FOUNDATION_PATH = r"C:\xampp\htdocs\opik_Backend\path-foundation"
-HEAR_PATH = r"C:\xampp\htdocs\opik_Backend\hear"
+# Base URL for the HF Space
+# Adjust if the user provided a different one, but they said "nagireddy5/lifehealth-v1" space.
+# The endpoint is likely https://nagireddy5-lifehealth-v1.hf.space
+SPACE_URL = settings.HUGGINGFACE_SPACE
 
 class MedVQA:
     def __init__(self):
-        self.space_id = "nagireddy5/lifehealth"
-        self.hf_token = os.getenv("HUGGINGFACE_API_KEY")
-        logger.info(f"Loading MedVQA from HF Space: {self.space_id}...")
-        self.client = None
+        self.base_url = SPACE_URL
+        self.timeout = 120.0 # Increased timeout for streaming/gen
+        logger.info(f"MedVQA initialized with base URL: {self.base_url}")
+
+    async def answer_question(self, question: str, image_path: Optional[str] = None):
+        """
+        Sends query to /agent/vision endpoint (Streaming Response).
+        Request Body: {"prompt": "...", "image_url": "..."}
+        Yields chunks of text.
+        """
+        endpoint = f"{self.base_url}/agent/vision"
         
-        try:
-            from gradio_client import Client
-            self.client = Client(self.space_id)
-            logger.info("MedVQA HF Space Client loaded.")
-        except Exception as e:
-            logger.warning(f"Could not connect to MedVQA Space {self.space_id}: {e}")
+        payload = {"prompt": question}
+        if image_path and image_path.startswith("http"):
+            payload["image_url"] = image_path
 
-    def answer_question(self, question, image_path=None):
-        if not self.client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
-                from gradio_client import Client
-                self.client = Client(self.space_id)
+                # The endpoint returns a StreamingResponse (text/plain)
+                # Pass data as JSON body
+                async with client.stream("POST", endpoint, json=payload) as resp:
+                    resp.raise_for_status()
+                    async for chunk in resp.aiter_text():
+                        yield chunk
             except Exception as e:
-                return f"Error: Model not connected. {e}"
-
-        try:
-            # API expects image_url (string) and question (string)
-            image_url = image_path if image_path else None
-            
-            result = self.client.predict(
-                image_url=image_url, 
-                question=question, 
-                api_name="/stream_answer" 
-            )
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Inference Error: {e}")
-            return f"Error processing request: {e}"
-
-class PathFoundation:
-    def __init__(self):
-        self.model_id = PATH_FOUNDATION_PATH
-        logger.info(f"Loading PathFoundation from {self.model_id}...")
-        try:
-            self.model = AutoModel.from_pretrained(self.model_id, trust_remote_code=True, device_map="auto")
-            logger.info("PathFoundation loaded.")
-        except Exception as e:
-            logger.warning(f"Failed to load PathFoundation: {e}")
-
-class HearModel:
-    def __init__(self):
-        self.model_id = HEAR_PATH
-        logger.info(f"Loading HeAR from {self.model_id}...")
-        try:
-            self.model = AutoModel.from_pretrained(self.model_id, trust_remote_code=True, device_map="auto")
-            logger.info("HeAR loaded.")
-        except Exception as e:
-            logger.warning(f"Failed to load HeAR: {e}")
+                logger.error(f"MedVQA Error: {e}")
+                yield f"Error connecting to AI Agent: {e}"
 
 class MedASR:
     def __init__(self):
-        self.model_id = MEDASR_PATH
-        self.pipeline = None
-        logger.info(f"Loading MedASR from {self.model_id}...")
-        try:
-             self.pipeline = pipeline(
-                "automatic-speech-recognition", 
-                model=self.model_id, 
-                device=0 if torch.cuda.is_available() else -1,
-                chunk_length_s=30,
-                stride_length_s=5,
-                trust_remote_code=True
-            )
-             logger.info("MedASR Model loaded.")
-        except Exception as e:
-            logger.warning(f"Could not load MedASR from {self.model_id}: {e}")
+        self.base_url = SPACE_URL
+        self.timeout = 60.0
 
-    def transcribe(self, audio_input):
-        if not self.pipeline: return ""
-        return self.pipeline(audio_input)["text"]
+    async def transcribe(self, audio_data: bytes, filename: str = "audio.wav") -> str:
+        """
+        Sends audio bytes as a file upload to /agent/speech.
+        """
+        endpoint = f"{self.base_url}/agent/speech"
+        
+        # Prepare multipart/form-data
+        files = {"file": (filename, audio_data, "audio/wav")}
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            try:
+                resp = await client.post(endpoint, files=files)
+                resp.raise_for_status()
+                data = resp.json()
+                return data.get("transcription", "")
+            except Exception as e:
+                logger.error(f"MedASR Error: {e}")
+                return ""
+
+class MedSigLIP:
+    def __init__(self):
+        self.base_url = SPACE_URL
+        self.timeout = 30.0
+
+    async def predict_text(self, image_url: str, candidates: list[str]) -> dict:
+        """
+        Zero-shot classification.
+        Request Body: {"image_url": "...", "candidates": [...]}
+        """
+        endpoint = f"{self.base_url}/agent/siglip/text"
+        payload = {
+            "image_url": image_url,
+            "candidates": candidates
+        }
+        
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            try:
+                # Send as JSON body
+                resp = await client.post(endpoint, json=payload)
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as e:
+                logger.error(f"MedSigLIP Error: {e}")
+                return {}
 
 # Singletons
 llm_instance = None
-path_instance = None
-hear_instance = None
 medasr_instance = None
+siglip_instance = None
 
 def get_vqa_chain():
     global llm_instance
@@ -109,18 +106,12 @@ def get_medasr_chain():
     if medasr_instance is None:
         medasr_instance = MedASR()
     return medasr_instance
-
-def get_path_foundation():
-    global path_instance
-    if path_instance is None:
-        path_instance = PathFoundation()
-    return path_instance
-
-def get_hear_model():
-    global hear_instance
-    if hear_instance is None:
-        hear_instance = HearModel()
-    return hear_instance
+    
+def get_siglip_model():
+    global siglip_instance
+    if siglip_instance is None:
+        siglip_instance = MedSigLIP()
+    return siglip_instance
 
 
 

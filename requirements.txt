@@ -43,6 +43,9 @@ langchain-huggingface>=0.1
 supabase>=2.4
 pypdf
 langchain-community
+langchain-tavily
+tavily-python
+langchain-groq
 livekit-api
 livekit-agents
 livekit-plugins-google

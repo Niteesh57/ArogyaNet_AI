@@ -1,71 +1,53 @@
 """
-Voice Agent - Medical Speech-to-Text using Google MedASR
-WebSocket endpoint to receive audio, transcribe using google/medasr, 
-and return text. Runs on GPU if available.
+Voice Agent - Medical Speech-to-Text using Remote MedASR
+WebSocket endpoint to receive audio, transcribe using remote HF Space.
 """
 import io
 import logging
-import numpy as np
-import torch
-import librosa
-from transformers import pipeline
-import logging
-import numpy as np
-import torch
-import librosa
-import io
-
-logger = logging.getLogger(__name__)
-
+import base64
+import wave
 from app.agent.LLM.llm import get_medasr_chain
 
 logger = logging.getLogger(__name__)
 
 SAMPLE_RATE = 16000
 
-def transcribe_audio(audio_bytes: bytes) -> str:
+async def transcribe_audio(audio_bytes: bytes) -> str:
     """
-    Transcribe raw audio bytes (WAV / raw PCM) to text using MedASR pipeline from llm.py.
+    Transcribe raw audio bytes (WAV / raw PCM) to text using Remote MedASR.
+    Wraps PCM in WAV container if needed, then uploads as file.
     """
     medasr = get_medasr_chain()
     
-    # ─── 1. Decode Audio to Numpy (32-bit float @ 16kHz) ───
-    speech = None
+    # ─── 1. Ensure Audio is WAV ───
+    final_wav_bytes = audio_bytes
     
-    # Try detecting WAV header
-    is_wav = audio_bytes.startswith(b'RIFF')
-    
-    if is_wav:
+    # Simple check for RIFF header
+    if not audio_bytes.startswith(b'RIFF'):
+        # Assume Raw 16-bit PCM @ 16kHz
+        # Wrap in WAV header
         try:
-            # Load with librosa (supports WAV, WebM if codecs exist)
-            speech, _ = librosa.load(io.BytesIO(audio_bytes), sr=SAMPLE_RATE)
-        except Exception:
-            pass
-
-    if speech is None:
-        # Fallback: Treat as Raw 16-bit PCM @ 16kHz
-        try:
-            raw = np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-            if len(raw) == 0: return ""
-            
-            # Resample if needed (though we expect 16kHz from frontend now)
-            if SAMPLE_RATE != 16000:
-                speech = librosa.resample(raw, orig_sr=SAMPLE_RATE, target_sr=16000)
-            else:
-                speech = raw
+            with io.BytesIO() as wav_io:
+                with wave.open(wav_io, 'wb') as wav_file:
+                    wav_file.setnchannels(1)
+                    wav_file.setsampwidth(2) # 16-bit
+                    wav_file.setframerate(SAMPLE_RATE)
+                    wav_file.writeframes(audio_bytes)
+                final_wav_bytes = wav_io.getvalue()
         except Exception as e:
-            logger.error(f"Audio decoding failed: {e}")
+            logger.error(f"Failed to wrap PCM in WAV: {e}")
             return ""
 
-    if len(speech) < 100: # specific tiny check
+    if len(final_wav_bytes) < 100:
         return ""
 
-    # ─── 2. Run Pipeline ───
+    # ─── 2. Call Remote API (File Upload) ───
     try:
-        return medasr.transcribe(speech)
+        # Pass bytes directly, llm.py handles multipart upload
+        return await medasr.transcribe(final_wav_bytes, filename="speech.wav")
     except Exception as e:
-        logger.error(f"Pipeline inference error: {e}")
-        # Don't raise, just return empty to keep stream alive? 
+        logger.error(f"Remote transcription error: {e}")
         return ""
+
 
 
