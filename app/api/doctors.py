@@ -38,6 +38,46 @@ async def read_doctor_patients(
     patients = result.scalars().all()
     return patients
 
+@router.get("/me/followups/today", response_model=List[Any])
+async def read_doctor_followups_today(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Get follow-up appointments scheduled for today.
+    """
+    from datetime import date
+    from sqlalchemy.orm import selectinload
+    from app.schemas.appointment import AppointmentWithDoctor
+    
+    # 1. Verify Doctor
+    doctor_profile = await crud_doctor.get_by_user_id(db, user_id=current_user.id)
+    if not doctor_profile:
+        raise HTTPException(status_code=400, detail="Current user is not registered as a doctor")
+        
+    # 2. Query for appointments with follow_up_date == today
+    today = date.today()
+    
+    query = select(Appointment).options(
+        selectinload(Appointment.patient),
+        selectinload(Appointment.doctor).selectinload(Doctor.user),
+        selectinload(Appointment.doctor).selectinload(Doctor.hospital),
+        selectinload(Appointment.nurse)
+    ).filter(
+        Appointment.doctor_id == doctor_profile.id,
+        Appointment.next_followup == today
+    )
+    
+    result = await db.execute(query)
+    appointments = result.scalars().all()
+    
+    # Map to schema (reusing mapping logic if available, or just returning list)
+    # The response_model=List[Any] allows flexibility, but ideally we return Appointment schemas
+    # Let's import the mapping logic or duplicate it slightly for now to ensure we get patient details
+    
+    from app.api.appointments import _map_appointments
+    return await _map_appointments(appointments)
+
 @router.get("/search-potential", response_model=List[UserSchema])
 async def search_potential_doctors(
     q: str = Query(..., min_length=1),

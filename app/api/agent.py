@@ -12,6 +12,7 @@ from app.api import deps
 from app.models.user import User
 from app.agent.summarizeAgent import create_appointment_suggestion
 from app.agent.Basemodels.summarizeModel import AppointmentSummary
+from app.utils.voice_trigger import trigger_call
 
 router = APIRouter()
 
@@ -120,3 +121,23 @@ async def get_appointment_chat_history(
     result = await db.execute(query)
     chats = result.scalars().all()
     return chats
+
+
+class CallTriggerRequest(BaseModel):
+    phone_number: str
+
+
+@router.post("/trigger-call")
+async def trigger_outbound_call(
+    request: CallTriggerRequest,
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """
+    Triggers an outbound call to the specified phone number using LiveKit SIP.
+    """
+    try:
+        await trigger_call(request.phone_number)
+        return {"message": f"Call initiated to {request.phone_number}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

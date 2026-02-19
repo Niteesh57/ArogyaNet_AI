@@ -1,4 +1,7 @@
 from contextlib import asynccontextmanager
+import subprocess
+import sys
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.api import api_router
@@ -13,6 +16,16 @@ from app.agent.LLM.llm import get_vqa_chain, get_medasr_chain, get_hear_model, g
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Startup
+    logger = logging.getLogger("uvicorn.error")
+    logger.info("Starting LiveKit Agent Worker...")
+    agent_process = None
+    try:
+        # Run the agent as a subprocess
+        agent_process = subprocess.Popen([sys.executable, "-m", "app.agent.callAgent", "start"])
+    except Exception as e:
+        logger.error(f"Failed to start agent worker: {e}")
+
     # Startup
     # Load AI Models (MedASR)
     # Load AI Models
@@ -56,6 +69,14 @@ async def lifespan(app: FastAPI):
     
     yield
     # Shutdown
+    if agent_process:
+        logger.info("Stopping LiveKit Agent Worker...")
+        agent_process.terminate()
+        try:
+            agent_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            agent_process.kill()
+    
     # await engine.dispose()
 
 app = FastAPI(

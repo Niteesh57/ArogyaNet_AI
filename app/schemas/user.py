@@ -19,11 +19,18 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
+    phone_number: Optional[str] = None
     password: Optional[str] = None
     is_active: Optional[bool] = None
     is_verified: Optional[bool] = None
     image: Optional[str] = None
     hospital_id: Optional[str] = None
+
+class UserProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
+    password: Optional[str] = None
 
 class UserInDBBase(UserBase):
     id: str
