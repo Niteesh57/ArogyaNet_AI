@@ -13,7 +13,7 @@ pydantic-settings>=2.3
 
 # -------- Auth --------
 python-jose[cryptography]>=3.3
-passlib[bcrypt]>=1.7
+bcrypt>=4.0.0
 Authlib>=1.3
 
 # -------- Forms / Uploads --------
