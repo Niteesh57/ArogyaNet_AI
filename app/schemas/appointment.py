@@ -21,6 +21,7 @@ class AppointmentBase(BaseModel):
     next_followup: Optional[date] = None  # Optional
     nurse_id: Optional[str] = None
     lab_report_id: Optional[str] = None
+    diet_plan: Optional[str] = None
 
 class AppointmentCreate(AppointmentBase):
     pass
@@ -48,6 +49,7 @@ class AppointmentUpdate(BaseModel):
     next_followup: Optional[date] = None
     nurse_id: Optional[str] = None
     lab_report_id: Optional[str] = None
+    diet_plan: Optional[str] = None
 
 class Appointment(AppointmentBase):
     id: str

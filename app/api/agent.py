@@ -288,3 +288,32 @@ async def expert_chat_endpoint(
         return StreamingResponse(stream, media_type="text/event-stream")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class DietPlannerRequest(BaseModel):
+    appointment_id: str
+    patient_problem: str
+    doctor_remarks: str
+
+from app.agent.dietPlannerAgent import stream_diet_plan
+
+@router.post("/diet-planner")
+async def diet_planner_endpoint(
+    request: DietPlannerRequest,
+    current_user: User = Depends(deps.get_current_doctor),
+    db: AsyncSession = Depends(deps.get_db)
+):
+    """
+    Generate and stream a diet plan for a patient based on their health problem and doctor's remarks.
+    Only accessible by users with the DOCTOR role.
+    Returns: Server-Sent Events (SSE).
+    """
+    try:
+        stream = stream_diet_plan(
+            appointment_id=request.appointment_id,
+            patient_problem=request.patient_problem,
+            doctor_remarks=request.doctor_remarks,
+            db=db
+        )
+        return StreamingResponse(stream, media_type="text/event-stream")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

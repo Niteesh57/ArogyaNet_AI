@@ -15,3 +15,4 @@ from app.models.appointment_chat import AppointmentChat
 from app.models.appointment_vital import AppointmentVital
 from app.models.lab_report import LabReport
 from app.models.user_memory import UserMemory
+from app.models.doctor_patient_chat import DoctorPatientChat

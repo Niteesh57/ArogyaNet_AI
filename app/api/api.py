@@ -16,7 +16,8 @@ from app.api import (
     lab_reports,
     inventory,
     availability,
-    events
+    events,
+    chat
 )
 
 api_router = APIRouter()
@@ -37,3 +38,4 @@ api_router.include_router(lab_reports.router, prefix="/lab-reports", tags=["lab-
 api_router.include_router(inventory.router, prefix="/inventory", tags=["inventory"])
 api_router.include_router(availability.router, prefix="/availability", tags=["availability"])
 api_router.include_router(events.router, prefix="/events", tags=["events"])
+api_router.include_router(chat.router, prefix="/chat", tags=["chat"])

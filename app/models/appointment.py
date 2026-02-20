@@ -33,6 +33,7 @@ class Appointment(Base):
     next_followup = Column(Date, nullable=True)
     nurse_id = Column(String, ForeignKey("users.id"), nullable=True) # Link to User (Nurse role)
     lab_report_id = Column(String, ForeignKey("lab_reports.id"), nullable=True)
+    diet_plan = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

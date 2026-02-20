@@ -57,3 +57,12 @@ def get_current_hospital_admin(
             status_code=400, detail="The user doesn't have enough privileges"
         )
     return current_user
+
+def get_current_doctor(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    if current_user.role != UserRole.DOCTOR.value:
+        raise HTTPException(
+            status_code=403, detail="Access forbidden: Doctor role required"
+        )
+    return current_user
