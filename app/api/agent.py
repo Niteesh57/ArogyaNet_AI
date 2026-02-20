@@ -235,8 +235,56 @@ async def search_expert_checks(
         results = await retrieve_checks(
             query=query,
             hospital_id=hospital_id,
+            user_hospital_id=hospital_id, # Must match
             category=category
         )
         return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ExpertChatRequest(BaseModel):
+    query: str
+    category: Optional[str] = None
+    hospital_id: Optional[str] = None # Allow strict filtering override
+
+from app.agent.ExpAgent import stream_expert_answer
+
+@router.post("/expert-chat")
+async def expert_chat_endpoint(
+    request: ExpertChatRequest,
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """
+    Stream an expert medical answer based on the knowledge base.
+    Uses GENERAL_MODEL + Pinecone Context.
+    Returns: Server-Sent Events (SSE).
+    """
+    # 1. Determine Hospital ID and Filtering Logic
+    if request.hospital_id:
+        # Explicit override -> Search ONLY this hospital (Strict)
+        target_hospital_id = request.hospital_id
+        strict_mode = True
+        # Only show sensitive data if it matches user's hospital
+        user_verification_id = current_user.hospital_id 
+    else:
+        # Default -> User's hospital, with fallback to Global (Not Strict)
+        target_hospital_id = current_user.hospital_id
+        strict_mode = False
+        # Valid use case: Implicit search should NOT show detailed meds/labs (Summary Mode)
+        user_verification_id = "HIDDEN" 
+        
+    if not target_hospital_id:
+        raise HTTPException(status_code=400, detail="User must belong to a hospital or provide hospital_id")
+        
+    try:
+        stream = stream_expert_answer(
+            query=request.query,
+            hospital_id=target_hospital_id,
+            user_hospital_id=user_verification_id,
+            category=request.category,
+            strict_hospital=strict_mode
+        )
+        return StreamingResponse(stream, media_type="text/event-stream")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
