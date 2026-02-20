@@ -46,6 +46,7 @@ langchain-community
 langchain-tavily
 tavily-python
 langchain-groq
+pinecone
 livekit-api
 livekit-agents
 livekit-plugins-google

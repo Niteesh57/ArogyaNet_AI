@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     HUGGINGFACE_SPACE: str = ""
     TAVILY_API_KEY: str = ""
     GROQ_API_KEY: str = ""
+    PINECONE_API_KEY: str = ""
+    
     FIRST_SUPERUSER: EmailStr = "admin@example.com"
     FIRST_SUPERUSER_PASSWORD: str = "adminpassword"
 

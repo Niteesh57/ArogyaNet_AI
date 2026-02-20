@@ -172,3 +172,71 @@ async def deep_research_endpoint(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class ExpertCheckRequest(BaseModel):
+    check_text: str
+    category: str
+    hospital_id: Optional[str] = None
+    medication: List[str] = []
+    lab_test: List[str] = []
+
+from app.agent.ExpAgent import upsert_check, retrieve_checks
+import uuid
+
+@router.post("/expert-check")
+async def add_expert_check(
+    request: ExpertCheckRequest,
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """
+    Store a senior doctor's insight/check into the knowledge base (Pinecone).
+    """
+    try:
+        # Use provided hospital_id or fallback to user's hospital
+        hospital_id = request.hospital_id or current_user.hospital_id
+        if not hospital_id:
+             raise HTTPException(status_code=400, detail="Hospital ID required")
+
+        check_id = str(uuid.uuid4())
+        
+        # Convert lists to strings for embedding/metadata
+        medication_str = ", ".join(request.medication) if request.medication else ""
+        lab_test_str = ", ".join(request.lab_test) if request.lab_test else ""
+        
+        result = await upsert_check(
+            check_id=check_id,
+            check_text=request.check_text,
+            category=request.category,
+            hospital_id=hospital_id,
+            medication=medication_str,
+            lab_test=lab_test_str
+        )
+        
+        if result.get("status") == "error":
+            raise HTTPException(status_code=500, detail=result.get("message"))
+            
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/expert-check", response_model=List[dict])
+async def search_expert_checks(
+    query: str,
+    category: Optional[str] = None,
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """
+    Search for expert insights/checks.
+    """
+    try:
+        hospital_id = current_user.hospital_id
+        if not hospital_id:
+             raise HTTPException(status_code=400, detail="User must belong to a hospital")
+             
+        results = await retrieve_checks(
+            query=query,
+            hospital_id=hospital_id,
+            category=category
+        )
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
