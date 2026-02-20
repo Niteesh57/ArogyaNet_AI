@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Life Health CRM"
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = "CHANGE_THIS_SECRET_KEY_IN_PRODUCTION"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 90
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 525600 # 1 Year
     ALGORITHM: str = "HS256"
     
     # BACKEND_CORS_ORIGINS is a JSON-formatted list of origins

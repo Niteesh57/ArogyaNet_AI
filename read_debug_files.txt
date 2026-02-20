@@ -1,8 +1,0 @@
-Special Tokens Map: {'bos_token': '<bos>', 'eos_token': '<eos>', 'unk_token': '<unk>', 'pad_token': '<pad>', 'mask_token': '<mask>', 'boi_token': '<start_of_image>', 'eoi_token': '<end_of_image>', 'image_token': '<image_soft_token>'}
-Token '<image>' ID: 3
-Token '<|image|>' ID: 3
-Token '<image_token>' ID: 3
-Token '<|image_token|>' ID: 3
-Token '<|image|>' ID: 3
-Searching vocab for 'image'...
-Vocab matches (first 20): ['imageView', 'images', 'imagens', '▁imageHeight', 'imagery', '▁imagenes', '▁imageName', 'imageData', '▁images', 'image', '▁imagens', '<end_of_image>', 'imagem', 'imageList', '▁imagem', '<start_of_image>', '▁imagen', '▁image', 'imagenes', 'imageNamed']
