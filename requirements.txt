@@ -23,7 +23,7 @@ python-dotenv
 # -------- Networking --------
 httpx>=0.27
 requests>=2.32
-
+Pillow
 
 # -------- LangChain Stack --------
 langchain>=0.2
