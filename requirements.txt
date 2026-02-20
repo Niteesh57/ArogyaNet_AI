@@ -14,7 +14,6 @@ pydantic-settings>=2.3
 python-jose[cryptography]>=3.3
 passlib[bcrypt]>=1.7
 Authlib>=1.3
-itsdangerous>=2.2
 
 # -------- Forms / Uploads --------
 python-multipart
@@ -24,20 +23,10 @@ python-dotenv
 httpx>=0.27
 requests>=2.32
 
-# -------- AI / LLM --------
-google-genai
-huggingface-hub>=0.34
-gradio_client>=1.0
-transformers>=5.2
-accelerate>=0.30
-sentence-transformers>=3.0
-sentencepiece
-protobuf
 
 # -------- LangChain Stack --------
 langchain>=0.2
 langgraph>=0.2
-langchain-huggingface>=0.1
 
 # -------- Vector / DB --------
 supabase>=2.4
@@ -48,7 +37,5 @@ tavily-python
 langchain-groq
 google-auth
 pinecone
-livekit-api
 livekit-agents
 livekit-plugins-google
-livekit-plugins-silero
