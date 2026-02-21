@@ -25,18 +25,24 @@ Doctor's Remarks: {doctor_remarks}
 Requirements for the output:
 1. Provide a realistic, day-wise diet plan meant to be followed strictly.
 2. For each day, include specific timestamps or clear meal times (e.g., "08:00 AM - Breakfast:", "11:00 AM - Mid-Morning Snack:", "01:30 PM - Lunch:").
-3. Be highly prescriptive and clear about what to eat and avoid based exactly on the constraints (e.g., if Doctor remarks mention 'no salt', emphasize zero sodium alternatives).
+3. Be highly prescriptive and clear about what to eat and avoid based exactly on the constraints.
 4. Organize the plan clearly with markdown formatting (e.g., Headers for Days, bold for times).
-5. Add a brief, encouraging conclusion.
+5. **IMPORTANT:** Include two separate sections at the end:
+   - **Recommended Foods (Foods to Take):** A list of specific foods that will benefit the patient.
+   - **Foods to Avoid:** A list of specific foods the patient must stay away from.
+6. **LANGUAGE CONSTRAINT:** You MUST write the entire response in the SAME LANGUAGE as the Doctor's Remarks provided above. If the remarks are in Hindi, the plan must be in Hindi. If they are in English, the plan must be in English.
+7. Add a brief, encouraging conclusion.
 
 Example Format:
 ### Day 1
 **08:00 AM - Breakfast:** 1 bowl of oatmeal with fresh berries (no added sugar).
-**11:00 AM - Mid-Morning Snack:** 1 apple and a handful of unsalted almonds.
-**01:30 PM - Lunch:** Grilled chicken breast with a large side of steamed spinach and quinoa.
 ...
-### Day 2
+### Day 7
 ...
+### Recommended Foods (Foods to Take)
+- ...
+### Foods to Avoid
+- ...
 
 Remember, you are speaking directly to the user (patient) on behalf of the healthcare team. Keep a professional yet compassionate tone.
 """

@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
-    FRONTEND_URL: str = "http://localhost:8080"
+    FRONTEND_URL: str = ""
     SESSION_SECRET: str = "super-secret-session-key"
     
     IMGBB_API_KEY: str = "ac2540a154fa82c1350b98214446a8ee"
