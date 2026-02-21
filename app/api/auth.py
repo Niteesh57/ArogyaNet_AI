@@ -155,8 +155,7 @@ async def auth_google_callback(
     )
     
     # Redirect to frontend with token
-    # Using http://localhost:8080/oauth-success?token=<JWT> as requested
-    frontend_url = f"http://localhost:8080/oauth-success?token={access_token}"
+    frontend_url = f"{settings.FRONTEND_URL}/oauth-success?token={access_token}"
     return RedirectResponse(url=frontend_url)
 
 @router.get("/me", response_model=User)

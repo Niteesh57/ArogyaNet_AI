@@ -1,5 +1,5 @@
-from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Any, List, Optional, Set, Dict
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timezone
@@ -7,10 +7,72 @@ from datetime import datetime, timezone
 from app.api import deps
 from app.models.user import User, UserRole
 from app.models.event import Event
-from app.schemas.event import EventCreate, Event as EventSchema, EventDataAppend, EventUpdate
+from app.schemas.event import EventCreate, Event as EventSchema, EventDataAppend, EventUpdate, EventStatsFilters
 
 
 router = APIRouter()
+
+@router.get("/stats/filters", response_model=EventStatsFilters)
+async def get_event_filters(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Get unique filter options (places and keys) for dashboard graphs.
+    """
+    result = await db.execute(select(Event))
+    events = result.scalars().all()
+    
+    unique_places = set()
+    all_keys = set()
+    
+    for event in events:
+        if event.keys:
+            all_keys.update(event.keys)
+        
+        if event.json_data:
+            for entry in event.json_data:
+                place = entry.get("place_name")
+                if place:
+                    unique_places.add(place)
+                    
+    return {
+        "places": sorted(list(unique_places)),
+        "available_keys": sorted(list(all_keys))
+    }
+
+@router.get("/stats/graph-data", response_model=List[Dict[str, Any]])
+async def get_event_graph_data(
+    place_name: Optional[str] = Query(None),
+    event_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+) -> Any:
+    """
+    Get detailed entries filtered by place or event for graphical representation.
+    """
+    query = select(Event)
+    if event_id:
+        query = query.where(Event.id == event_id)
+        
+    result = await db.execute(query)
+    events = result.scalars().all()
+    
+    filtered_data = []
+    for event in events:
+        if event.json_data:
+            for entry in event.json_data:
+                # Apply place filter if provided
+                if place_name and entry.get("place_name") != place_name:
+                    continue
+                
+                # Include entry
+                entry_copy = entry.copy()
+                entry_copy["_event_name"] = event.event_name
+                entry_copy["_event_id"] = event.id
+                filtered_data.append(entry_copy)
+                
+    return filtered_data
 
 @router.get("/", response_model=List[EventSchema])
 async def read_events(

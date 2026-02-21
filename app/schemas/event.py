@@ -31,3 +31,11 @@ class Event(EventBase):
 
     class Config:
         from_attributes = True
+
+class EventStatsFilters(BaseModel):
+    places: List[str]
+    available_keys: List[str]
+
+class EventGraphDataRequest(BaseModel):
+    place_name: Optional[str] = None
+    event_id: Optional[str] = None

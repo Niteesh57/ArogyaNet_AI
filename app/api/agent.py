@@ -317,3 +317,49 @@ async def diet_planner_endpoint(
         return StreamingResponse(stream, media_type="text/event-stream")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class EventDataPopulatorRequest(BaseModel):
+    image_url: str
+    keys: List[str]
+
+from app.agent.eventDataPopulator import populate_event_data
+
+@router.post("/populate-event-data")
+async def populate_event_data_endpoint(
+    request: EventDataPopulatorRequest,
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """
+    Extract structured data from an image based on provided keys.
+    Returns a JSON object with extracted values.
+    """
+    try:
+        result = await populate_event_data(
+            image_url=request.image_url,
+            keys=request.keys
+        )
+        if "error" in result:
+             raise HTTPException(status_code=500, detail=result["error"])
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class MedicalSummarizeRequest(BaseModel):
+    image_url: str
+
+from app.agent.medicalSummarizer import stream_medical_summary
+
+@router.post("/summarize-medical-report")
+async def summarize_medical_report_endpoint(
+    request: MedicalSummarizeRequest,
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """
+    Summarize a medical report or prescription image.
+    Returns: Server-Sent Events (SSE).
+    """
+    try:
+        stream = stream_medical_summary(image_url=request.image_url)
+        return StreamingResponse(stream, media_type="text/event-stream")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
