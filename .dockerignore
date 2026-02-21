@@ -11,5 +11,4 @@ __pycache__/
 venv/
 env/
 .venv/
-sql_app.db
 sql_app copy.db
