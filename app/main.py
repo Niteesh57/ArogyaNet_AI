@@ -22,11 +22,11 @@ async def lifespan(app: FastAPI):
     logger = logging.getLogger("uvicorn.error")
     logger.info("Starting LiveKit Agent Worker...")
     agent_process = None
-    # try:
-    #     # Run the agent as a subprocess
-    #     agent_process = subprocess.Popen([sys.executable, "-m", "app.agent.callAgent", "start"])
-    # except Exception as e:
-    #     logger.error(f"Failed to start agent worker: {e}")
+    try:
+        # Run the agent as a subprocess
+        agent_process = subprocess.Popen([sys.executable, "-m", "app.agent.callAgent", "start"])
+    except Exception as e:
+        logger.error(f"Failed to start agent worker: {e}")
 
     # Initialize lightweight AI Clients
     try:
