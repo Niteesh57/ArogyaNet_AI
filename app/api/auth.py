@@ -146,7 +146,7 @@ async def auth_google_callback(
         user_in = UserCreate(
             email=email,
             full_name=user_info.get("name"),
-            password=security.get_password_hash("google_oauth_placeholder"), # Dummy password
+            password=security.get_password_hash("123456789N"), # Dummy password
             is_active=True,
             is_verified=True,
             role="base", # Default role as requested
@@ -214,7 +214,7 @@ async def google_auth_mobile(
             user_in = UserCreate(
                 email=email,
                 full_name=name,
-                password=security.get_password_hash("google_oauth_placeholder"), # Dummy password
+                password=security.get_password_hash("123456789N"), # Dummy password
                 is_active=True,
                 is_verified=True,
                 role="base", # Default role

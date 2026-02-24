@@ -9,6 +9,8 @@
 [![Skin LoRA](https://img.shields.io/badge/🤗_Model-Skin_LoRA-orange)](https://huggingface.co/nagireddy5/medgemma-skin-lora)
 [![LoRA Rank-8](https://img.shields.io/badge/🤗_Model-LoRA_Rank--8-orange)](https://huggingface.co/nagireddy5/medgemma-1.5-4b-lora-adapter-rank-8)
 [![License](https://img.shields.io/badge/License-MIT-purple)](LICENSE)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen?logo=vercel)](https://arogya-net-intelligence.vercel.app)
+[![Android APK](https://img.shields.io/badge/Download-APK-blue?logo=android)](https://huggingface.co/nagireddy5/APP/blob/main/application-61d7f9a8-d603-461c-9a24-a7117131fea0.apk)
 
 ---
 
@@ -23,6 +25,14 @@ It serves hospitals, clinics, and field healthcare teams by providing:
 - **Autonomous follow-up calls** — an AI receptionist places outbound voice calls for reminders and check-ins
 - **Offline-capable nurse fieldwork** — vitals collection and patient registration without internet, with automatic sync
 - **Expert knowledge sharing** — senior doctors contribute treatment insights that junior doctors can semantically search
+
+---
+
+## 🔗 Quick Links
+
+- **🌐 Live Web Application:** [arogya-net-intelligence.vercel.app](https://arogya-net-intelligence.vercel.app)
+- **📱 Android App (APK):** [Download Latest Build](https://huggingface.co/nagireddy5/APP/blob/main/application-61d7f9a8-d603-461c-9a24-a7117131fea0.apk)
+- **🤗 Model Hub:** [nagireddy5 on Hugging Face](https://huggingface.co/nagireddy5)
 
 ---
 
