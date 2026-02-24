@@ -5,6 +5,9 @@
 [![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green?logo=fastapi)](https://fastapi.tiangolo.com)
 [![HuggingFace](https://img.shields.io/badge/🤗_HuggingFace-Spaces-yellow)](https://huggingface.co/spaces/nagireddy5/Lifehealth-v1)
+[![MedGemma Edge](https://img.shields.io/badge/🤗_Model-MedGemma_GGUF_Edge-orange)](https://huggingface.co/nagireddy5/medgemma_Q3_K_M_Edge)
+[![Skin LoRA](https://img.shields.io/badge/🤗_Model-Skin_LoRA-orange)](https://huggingface.co/nagireddy5/medgemma-skin-lora)
+[![LoRA Rank-8](https://img.shields.io/badge/🤗_Model-LoRA_Rank--8-orange)](https://huggingface.co/nagireddy5/medgemma-1.5-4b-lora-adapter-rank-8)
 [![License](https://img.shields.io/badge/License-MIT-purple)](LICENSE)
 
 ---
@@ -59,6 +62,20 @@ graph TB
         Q[ExpertAgent] --> R[Pinecone Vector DB]
     end
 ```
+
+---
+
+## 🤗 Published Models
+
+We publish **3 custom models** on Hugging Face for edge deployment and specialized medical reasoning:
+
+| Model | Type | Purpose | Link |
+|-------|------|---------|------|
+| **medgemma_Q3_K_M_Edge** | GGUF (3-bit quantized) | On-device / edge inference — runs on mobile and low-power hardware without a GPU | [🤗 Model](https://huggingface.co/nagireddy5/medgemma_Q3_K_M_Edge) |
+| **medgemma-skin-lora** | PEFT LoRA Adapter (~65 MB) | Indian skin disease specialist — fine-tuned for Fitzpatrick III–VI skin types and tropical conditions | [🤗 Model](https://huggingface.co/nagireddy5/medgemma-skin-lora) |
+| **medgemma-1.5-4b-lora-adapter-rank-8** | PEFT LoRA Adapter (Rank-8) | Low-VRAM deployment (8 GB) — maintains medical reasoning quality on consumer GPUs (RTX 3060/4060, T4) | [🤗 Model](https://huggingface.co/nagireddy5/medgemma-1.5-4b-lora-adapter-rank-8) |
+
+> All adapters are built on top of [`google/medgemma-1.5-4b-it`](https://huggingface.co/google/medgemma-1.5-4b-it).
 
 ---
 
@@ -223,7 +240,9 @@ Built on **SQLAlchemy 2.0** (async) with **SQLite** (dev) / **PostgreSQL** (prod
 | **LLM — General** | Google Gemini (`gemini-3-flash-preview`) |
 | **LLM — Synthesis** | Llama 3.3 70B via Groq |
 | **Vision** | MedGemma 1.5 4B-IT (4-bit quantized) |
-| **Skin LoRA** | `nagireddy5/medgemma-skin-lora` (PEFT) |
+| **Vision LoRA (Rank-8)** | [`nagireddy5/medgemma-1.5-4b-lora-adapter-rank-8`](https://huggingface.co/nagireddy5/medgemma-1.5-4b-lora-adapter-rank-8) — 8 GB VRAM optimized |
+| **Vision Edge (GGUF)** | [`nagireddy5/medgemma_Q3_K_M_Edge`](https://huggingface.co/nagireddy5/medgemma_Q3_K_M_Edge) — on-device inference |
+| **Skin LoRA** | [`nagireddy5/medgemma-skin-lora`](https://huggingface.co/nagireddy5/medgemma-skin-lora) (PEFT) |
 | **Speech** | Google MedASR (CTC) |
 | **Image Classification** | Google MedSigLIP-448 |
 | **Acoustic Health** | Google HeAR |
