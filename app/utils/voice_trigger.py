@@ -8,7 +8,9 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def trigger_call(phone_number: str, appointment_id: str = None):
+import json
+
+async def trigger_call(phone_number: str, appointment_id: str = None, doctor_prompt: str = None):
     """
     Triggers an outbound call to the specified phone number using LiveKit SIP.
     """
@@ -34,10 +36,14 @@ async def trigger_call(phone_number: str, appointment_id: str = None):
         
         logger.info(f"Starting AI Agent in room: {room_name}")
         
-        # Prepare metadata (pass appointment_id)
-        metadata = ""
+        # Prepare metadata (pass appointment_id and doctor_prompt)
+        metadata_dict = {}
         if appointment_id:
-            metadata = f"{{\"appointment_id\": \"{appointment_id}\"}}"
+            metadata_dict["appointment_id"] = appointment_id
+        if doctor_prompt:
+            metadata_dict["doctor_prompt"] = doctor_prompt
+            
+        metadata = json.dumps(metadata_dict) if metadata_dict else ""
 
         # Note: In some LiveKit setups, you might rely on the agent to auto-join rooms.
         # But here we stick to the user's requested logic of explicit dispatch.

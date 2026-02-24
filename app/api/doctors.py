@@ -154,7 +154,10 @@ async def get_doctor_name(
     
     # Eagerly load user relationship to get full_name
     await db.refresh(doctor, ["user"])
-    return {"full_name": doctor.user.full_name if doctor.user else "Unknown"}
+    return {
+        "full_name": doctor.user.full_name if doctor.user else "Unknown",
+        "specialization": doctor.specialization
+    }
 
 @router.get("/hospital/{hospital_id}/search", response_model=List[DoctorResponse])
 async def search_doctors_in_hospital(

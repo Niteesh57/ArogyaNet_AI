@@ -1,12 +1,14 @@
 import json
 import httpx
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from typing import List, Dict, Any
 from app.core.config import settings
 
-# Configure Gemini
+# Configure Gemini client
+client = None
 if settings.GOOGLE_API_KEY:
-    genai.configure(api_key=settings.GOOGLE_API_KEY)
+    client = genai.Client(api_key=settings.GOOGLE_API_KEY)
 
 async def populate_event_data(image_url: str, keys: List[str]) -> Dict[str, Any]:
     """
@@ -21,11 +23,7 @@ async def populate_event_data(image_url: str, keys: List[str]) -> Dict[str, Any]
             image_data = response.content
             
         # 2. Setup Gemini Model with structured output configuration
-        model_name = settings.GENERAL_MODEL or "gemini-1.5-flash"
-        model = genai.GenerativeModel(
-            model_name=model_name,
-            generation_config={"response_mime_type": "application/json"}
-        )
+        model_name = settings.GENERAL_MODEL or "gemini-3-flash-preview"
         
         # 3. Create prompt
         keys_str = ", ".join(keys)
@@ -48,10 +46,16 @@ Output Format:
         # model.generate_content can take a list containing the prompt and image data
         contents = [
             prompt,
-            {"mime_type": "image/jpeg", "data": image_data}
+            types.Part.from_bytes(data=image_data, mime_type="image/jpeg")
         ]
         
-        response = model.generate_content(contents)
+        response = client.models.generate_content(
+            model=model_name,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            )
+        )
         
         # 5. Parse and return JSON
         if response and response.text:

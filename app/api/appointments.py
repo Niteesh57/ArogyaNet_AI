@@ -398,9 +398,42 @@ async def read_appointments(
     current_user: User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
-    Get list of appointments.
+    Get list of appointments filtered by user role and hospital.
     """
-    appointments = await crud_appointment.get_multi(db, skip=skip, limit=limit)
+    from sqlalchemy import select
+    from app.models.appointment import Appointment as AppointmentModel
+    from app.models.doctor import Doctor
+    from app.models.user import UserRole
+    
+    query = select(AppointmentModel)
+    
+    if current_user.role == UserRole.SUPER_ADMIN.value:
+        pass # Admin sees all
+    elif current_user.role in [UserRole.HOSPITAL_ADMIN.value, UserRole.NURSE.value, UserRole.LAB_ASSISTANT.value]:
+        # View only appointments in their hospital (linked via Doctor)
+        if current_user.hospital_id:
+            query = query.join(Doctor).filter(Doctor.hospital_id == current_user.hospital_id)
+        else:
+            query = query.filter(AppointmentModel.id == "0") # No access
+    elif current_user.role == UserRole.DOCTOR.value:
+        from app.crud.doctor import doctor as crud_doctor
+        doctor_profile = await crud_doctor.get_by_user_id(db, user_id=current_user.id)
+        if doctor_profile:
+             query = query.filter(AppointmentModel.doctor_id == doctor_profile.id)
+        else:
+             query = query.filter(AppointmentModel.id == "0")
+    elif current_user.role == UserRole.PATIENT.value:
+        from app.crud.patient import patient as crud_patient
+        patient_profile = await crud_patient.get_by_user_id(db, user_id=current_user.id)
+        if patient_profile:
+            query = query.filter(AppointmentModel.patient_id == patient_profile.id)
+        else:
+            query = query.filter(AppointmentModel.id == "0")
+
+    query = query.order_by(AppointmentModel.date.desc(), AppointmentModel.slot.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    appointments = result.scalars().all()
+    
     return appointments
 
 @router.get("/{id}", response_model=Appointment)

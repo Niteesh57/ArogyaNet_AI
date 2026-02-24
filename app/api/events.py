@@ -20,7 +20,14 @@ async def get_event_filters(
     """
     Get unique filter options (places and keys) for dashboard graphs.
     """
-    result = await db.execute(select(Event))
+    query = select(Event)
+    if current_user.role != UserRole.SUPER_ADMIN.value:
+        if current_user.hospital_id:
+            query = query.join(User, Event.created_by_id == User.id).filter(User.hospital_id == current_user.hospital_id)
+        else:
+            query = query.filter(Event.id == "0") # No access
+            
+    result = await db.execute(query)
     events = result.scalars().all()
     
     unique_places = set()
@@ -55,6 +62,12 @@ async def get_event_graph_data(
     if event_id:
         query = query.where(Event.id == event_id)
         
+    if current_user.role != UserRole.SUPER_ADMIN.value:
+        if current_user.hospital_id:
+            query = query.join(User, Event.created_by_id == User.id).filter(User.hospital_id == current_user.hospital_id)
+        else:
+            query = query.filter(Event.id == "0") # No access
+            
     result = await db.execute(query)
     events = result.scalars().all()
     
@@ -84,7 +97,15 @@ async def read_events(
     """
     Retrieve events.
     """
-    result = await db.execute(select(Event).offset(skip).limit(limit))
+    query = select(Event)
+    if current_user.role != UserRole.SUPER_ADMIN.value:
+        if current_user.hospital_id:
+            query = query.join(User, Event.created_by_id == User.id).filter(User.hospital_id == current_user.hospital_id)
+        else:
+            query = query.filter(Event.id == "0") # No access
+            
+    query = query.offset(skip).limit(limit)
+    result = await db.execute(query)
     return result.scalars().all()
 
 

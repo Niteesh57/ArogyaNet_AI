@@ -6,7 +6,8 @@ import os
 from typing import Optional
 from datetime import date, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 
 from app.agent.Tools.doctorTools import get_doctors_with_availability
@@ -20,8 +21,8 @@ class AppointmentAgent:
     """
     
     def __init__(self):
-        genai.configure(api_key=str(settings.GOOGLE_API_KEY))
-        self.model_name = settings.GENERAL_MODEL
+        self.client = genai.Client(api_key=str(settings.GOOGLE_API_KEY))
+        self.model_name = settings.GENERAL_MODEL or "gemini-3-flash-preview"
     
     async def analyze_and_suggest_appointment(
         self,
@@ -62,14 +63,14 @@ class AppointmentAgent:
         prompt = self._create_analysis_prompt(description, doctor_info, appointment_date)
         
         # Call Gemini API with structured output
-        model = genai.GenerativeModel(
-            model_name=self.model_name,
-            generation_config={
-                "temperature": 0.3,
-                "response_mime_type": "application/json"
-            }
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.3,
+                response_mime_type="application/json"
+            )
         )
-        response = model.generate_content(prompt)
         
         # Parse the structured response
         import json

@@ -1,4 +1,4 @@
-import google.generativeai as genai
+from google import genai
 from pinecone import Pinecone
 from app.core.config import settings
 
@@ -6,9 +6,10 @@ from app.core.config import settings
 pc = Pinecone(api_key=settings.PINECONE_API_KEY)
 index = pc.Index("lifehealth")
 
-# Configure Gemini
+# Configure Gemini client
+client = None
 if settings.GOOGLE_API_KEY:
-    genai.configure(api_key=settings.GOOGLE_API_KEY)
+    client = genai.Client(api_key=settings.GOOGLE_API_KEY)
 
 def get_embedding(text: str, input_type: str = "passage") -> list[float]:
     """
@@ -245,10 +246,12 @@ Context:
 
 User Query: {query}
 """
-        model_name = settings.GENERAL_MODEL or "gemini-1.5-flash"
-        model = genai.GenerativeModel(model_name)
+        model_name = settings.GENERAL_MODEL or "gemini-3-flash-preview"
         
-        response = model.generate_content(system_prompt, stream=True)
+        response = client.models.generate_content_stream(
+            model=model_name,
+            contents=system_prompt
+        )
         
         for chunk in response:
             if chunk.text:

@@ -99,7 +99,7 @@ async def analyze_report(
             appointment_id=request.appointment_id,
             db=db
         )
-        return StreamingResponse(stream, media_type="text/plain")
+        return StreamingResponse(stream, media_type="text/event-stream")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -124,6 +124,7 @@ async def get_appointment_chat_history(
 class CallTriggerRequest(BaseModel):
     phone_number: str
     appointment_id: Optional[str] = None
+    doctor_prompt: Optional[str] = None
 
 
 @router.post("/trigger-call")
@@ -131,14 +132,39 @@ async def trigger_outbound_call(
     request: CallTriggerRequest,
     current_user: User = Depends(deps.get_current_active_user),
 ):
-    """
-    Triggers an outbound call to the specified phone number using LiveKit SIP.
-    """
     try:
-        await trigger_call(request.phone_number, request.appointment_id)
+        await trigger_call(request.phone_number, request.appointment_id, request.doctor_prompt)
         return {"message": f"Call initiated to {request.phone_number}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+from app.models.call_script import CallScript
+
+@router.get("/call-scripts/{appointment_id}")
+async def get_call_scripts(
+    appointment_id: str,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """
+    Retrieve the AI receptionist call transcript for a given appointment.
+    """
+    from sqlalchemy.future import select
+    query = select(CallScript).filter(CallScript.appointment_id == appointment_id).order_by(CallScript.created_at.asc())
+    result = await db.execute(query)
+    scripts = result.scalars().all()
+    
+    return {
+        "call_scripts": [
+            {
+                "id": script.id,
+                "speaker": script.speaker,
+                "message": script.message,
+                "created_at": script.created_at
+            }
+            for script in scripts
+        ]
+    }
 
 
 class DeepResearchRequest(BaseModel):
@@ -346,6 +372,12 @@ async def populate_event_data_endpoint(
 
 class MedicalSummarizeRequest(BaseModel):
     image_url: str
+    use_skin_specialist: bool = False
+    """
+    Set to True to route the image through the Indian Skin Specialist
+    (MedGemma + Indian Skin LoRA hosted on HuggingFace Space).
+    Default (False) uses Gemini Vision for general lab reports, prescriptions, and X-rays.
+    """
 
 from app.agent.medicalSummarizer import stream_medical_summary
 
@@ -355,11 +387,53 @@ async def summarize_medical_report_endpoint(
     current_user: User = Depends(deps.get_current_active_user),
 ):
     """
-    Summarize a medical report or prescription image.
+    Summarize a medical report or prescription image. Supports two modes:
+    - **General** (default): Lab reports, prescriptions, X-rays — analyzed by Gemini Vision.
+    - **Skin Specialist** (use_skin_specialist=true): Dermatology images — analyzed by
+      MedGemma + Indian Skin LoRA (Fitzpatrick III-VI, tropical conditions).
     Returns: Server-Sent Events (SSE).
     """
     try:
-        stream = stream_medical_summary(image_url=request.image_url)
+        stream = stream_medical_summary(
+            image_url=request.image_url,
+            use_skin_specialist=request.use_skin_specialist
+        )
         return StreamingResponse(stream, media_type="text/event-stream")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class HearEmbedRequest(BaseModel):
+    audio_url: str
+
+from app.agent.LLM.llm import get_hear_model
+
+@router.post("/hear-embed")
+async def hear_embed_endpoint(
+    request: HearEmbedRequest,
+    current_user: User = Depends(deps.get_current_active_user),
+):
+    """
+    Generate a HeAR (Health Acoustic Representation) embedding from an audio URL.
+    HeAR captures acoustic health signals — coughs, breathing patterns, cardiac sounds.
+    Returns: {"embeddings": [...], "dim": int}
+    Useful for downstream acoustic anomaly detection or similarity search.
+    """
+    import httpx as _httpx
+    try:
+        async with _httpx.AsyncClient() as client:
+            resp = await client.get(request.audio_url)
+            resp.raise_for_status()
+            audio_bytes = resp.content
+
+        hear = get_hear_model()
+        embedding = await hear.embed(audio_bytes, filename="patient_audio.wav")
+
+        if not embedding:
+            raise HTTPException(status_code=502, detail="HeAR model returned empty embedding. Check audio URL and HF Space status.")
+
+        return {"embeddings": embedding, "dim": len(embedding)}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

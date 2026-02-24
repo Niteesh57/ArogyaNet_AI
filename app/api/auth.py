@@ -158,6 +158,72 @@ async def auth_google_callback(
     frontend_url = f"{settings.FRONTEND_URL}/oauth-success?token={access_token}"
     return RedirectResponse(url=frontend_url)
 
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+
+@router.post("/google", response_model=Token)
+async def google_auth_mobile(
+    data: dict,
+    db: AsyncSession = Depends(deps.get_db)
+) -> Any:
+    """
+    Google OAuth token verification for Mobile App.
+    
+    - Receives Google ID token from frontend
+    - Verifies token directly with Google
+    - Creates user if doesn't exist
+    - Returns JWT access token
+    """
+    token = data.get("token")
+    if not token:
+        raise HTTPException(status_code=400, detail="Token is required")
+        
+    try:
+        # User explicitly provided the WEB client id for Android/iOS GoogleSignin
+        CLIENT_ID = "994195201263-nl156b5t0elh72k9v4lho8mfrg7sv2lj.apps.googleusercontent.com"
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            google_requests.Request(),
+            CLIENT_ID
+        )
+
+        email = idinfo.get("email")
+        name = idinfo.get("name")
+        picture = idinfo.get("picture")
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="Email not found in token")
+            
+        user = await crud_user.get_by_email(db, email=email)
+        
+        if not user:
+            # Auto-create user
+            user_in = UserCreate(
+                email=email,
+                full_name=name,
+                password=security.get_password_hash("google_oauth_placeholder"), # Dummy password
+                is_active=True,
+                is_verified=True,
+                role="base", # Default role
+                image=picture
+            )
+            user = await crud_user.create(db, obj_in=user_in)
+        
+        if not user.is_active:
+            raise HTTPException(status_code=400, detail="Inactive user")
+            
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        return {
+            "access_token": security.create_access_token(
+                user.id, expires_delta=access_token_expires
+            ),
+            "token_type": "bearer",
+        }
+
+    except ValueError as e:
+        print(f"Token verification failed: {str(e)}")
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+
 @router.get("/me", response_model=User)
 async def read_users_me(
     current_user: User = Depends(deps.get_current_active_user),

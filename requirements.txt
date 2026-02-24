@@ -29,7 +29,7 @@ itsdangerous
 # -------- LangChain Stack --------
 langchain>=0.2
 langgraph>=0.2
-google-generativeai
+google-genai
 # -------- Vector / DB --------
 supabase>=2.4
 pypdf

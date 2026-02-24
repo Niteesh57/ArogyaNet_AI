@@ -377,14 +377,41 @@ async def get_dashboard_stats(
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_hospital_admin),
 ) -> Any:
-    # Mock stats or implement count queries
+    from sqlalchemy import select, func
+    from app.models.doctor import Doctor
+    from app.models.nurse import Nurse
+    from app.models.patient import Patient
+    from app.models.medicine import Medicine
+    from app.models.lab_test import LabTest
+
+    hospital_id = current_user.hospital_id
+
+    async def get_count(model):
+        query = select(func.count(model.id))
+        if hospital_id and hasattr(model, 'hospital_id'):
+            query = query.filter(model.hospital_id == hospital_id)
+        result = await db.execute(query)
+        return result.scalar() or 0
+
+    total_doctors = await get_count(Doctor)
+    total_nurses = await get_count(Nurse)
+    total_patients = await get_count(Patient)
+    total_medicines = await get_count(Medicine)
+    total_lab_tests = await get_count(LabTest)
+    
+    low_stock_query = select(func.count(Medicine.id)).filter(Medicine.quantity <= 10)
+    if hospital_id:
+        low_stock_query = low_stock_query.filter(Medicine.hospital_id == hospital_id)
+    low_stock_result = await db.execute(low_stock_query)
+    low_stock_medicines = low_stock_result.scalar() or 0
+
     return {
-        "total_doctors": 0,
-        "total_nurses": 0,
-        "total_patients": 0,
-        "total_medicines": 0,
-        "low_stock_medicines": 0,
-        "total_lab_tests": 0
+        "total_doctors": total_doctors,
+        "total_nurses": total_nurses,
+        "total_patients": total_patients,
+        "total_medicines": total_medicines,
+        "low_stock_medicines": low_stock_medicines,
+        "total_lab_tests": total_lab_tests
     }
 @router.put("/users/{user_id}/role", response_model=Any)
 async def update_user_role(

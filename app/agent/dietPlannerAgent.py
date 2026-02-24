@@ -1,13 +1,14 @@
 import json
-import google.generativeai as genai
+from google import genai
 from app.core.config import settings
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.appointment import Appointment
 
-# Configure Gemini
+# Configure Gemini client
+client = None
 if settings.GOOGLE_API_KEY:
-    genai.configure(api_key=settings.GOOGLE_API_KEY)
+    client = genai.Client(api_key=settings.GOOGLE_API_KEY)
 
 async def stream_diet_plan(appointment_id: str, patient_problem: str, doctor_remarks: str, db: AsyncSession):
     """
@@ -46,10 +47,12 @@ Example Format:
 
 Remember, you are speaking directly to the user (patient) on behalf of the healthcare team. Keep a professional yet compassionate tone.
 """
-        model_name = settings.GENERAL_MODEL or "gemini-1.5-flash"
-        model = genai.GenerativeModel(model_name)
+        model_name = settings.GENERAL_MODEL or "gemini-3-flash-preview"
         
-        response = model.generate_content(system_prompt, stream=True)
+        response = client.models.generate_content_stream(
+            model=model_name,
+            contents=system_prompt
+        )
         
         full_plan = ""
         for chunk in response:

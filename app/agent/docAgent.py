@@ -187,12 +187,15 @@ async def analyze_medical_document(user_id: str, document_url: str, question: st
     # 3. Stream LLM Response
     full_response = ""
     try:
+        import json
         async for chunk in llm.answer_question(question=prompt, image_path=image_path):
             full_response += chunk
-            yield chunk
+            yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
+        
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
     except Exception as e:
         logger.error(f"Streaming error: {e}")
-        yield f"Error generating response: {e}"
+        yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
         return
 
     # Cleanup temp file if needed
