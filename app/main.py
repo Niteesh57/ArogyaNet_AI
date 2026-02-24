@@ -13,6 +13,8 @@ from sqlalchemy import select
 from app.core.database import SessionLocal
 
 from app.agent.LLM.llm import get_vqa_chain, get_medasr_chain, get_siglip_model
+from fastapi import BackgroundTasks
+from app.utils.wake_up import wake_up_huggingface
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -95,5 +97,6 @@ app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
-async def root():
+async def root(background_tasks: BackgroundTasks):
+    background_tasks.add_task(wake_up_huggingface)
     return {"message": "Welcome to Life Health CRM API"}

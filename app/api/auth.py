@@ -1,8 +1,9 @@
 from datetime import timedelta
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from app.utils.wake_up import wake_up_huggingface
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api import deps
 from app.core import security
@@ -19,7 +20,9 @@ router = APIRouter()
 
 @router.post("/login/access-token", response_model=Token)
 async def login_access_token(
-    db: AsyncSession = Depends(deps.get_db), form_data: OAuth2PasswordRequestForm = Depends()
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(deps.get_db), 
+    form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
     """
     OAuth2 compatible token login.
@@ -36,6 +39,10 @@ async def login_access_token(
     elif not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    # Wake up HuggingFace space in background
+    background_tasks.add_task(wake_up_huggingface)
+    
     return {
         "access_token": security.create_access_token(
             user.id, expires_delta=access_token_expires
@@ -101,6 +108,7 @@ async def login_google(request: Request):
 @router.get("/google/callback")
 async def auth_google_callback(
     request: Request,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(deps.get_db)
 ):
     """
@@ -156,6 +164,10 @@ async def auth_google_callback(
     
     # Redirect to frontend with token
     frontend_url = f"{settings.FRONTEND_URL}/oauth-success?token={access_token}"
+    
+    # Wake up HuggingFace space in background
+    background_tasks.add_task(wake_up_huggingface)
+    
     return RedirectResponse(url=frontend_url)
 
 from google.oauth2 import id_token
@@ -164,6 +176,7 @@ from google.auth.transport import requests as google_requests
 @router.post("/google", response_model=Token)
 async def google_auth_mobile(
     data: dict,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(deps.get_db)
 ) -> Any:
     """
@@ -213,6 +226,10 @@ async def google_auth_mobile(
             raise HTTPException(status_code=400, detail="Inactive user")
             
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        
+        # Wake up HuggingFace space in background
+        background_tasks.add_task(wake_up_huggingface)
+        
         return {
             "access_token": security.create_access_token(
                 user.id, expires_delta=access_token_expires
