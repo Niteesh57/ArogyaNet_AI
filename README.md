@@ -4,7 +4,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green?logo=fastapi)](https://fastapi.tiangolo.com)
-[![HuggingFace](https://img.shields.io/badge/🤗_HuggingFace-Spaces-yellow)](https://huggingface.co/spaces)
+[![HuggingFace](https://img.shields.io/badge/🤗_HuggingFace-Spaces-yellow)](https://huggingface.co/spaces/nagireddy5/Lifehealth-v1)
 [![License](https://img.shields.io/badge/License-MIT-purple)](LICENSE)
 
 ---
